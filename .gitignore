@@ -1,0 +1,13 @@
+node_modules/
+dist/
+coverage/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+# Nunca versionar documentos fiscais de clientes.
+*.xml
+*.pfx
+*.p12
+*.pem
