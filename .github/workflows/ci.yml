@@ -7,6 +7,19 @@ on:
 jobs:
   verificar:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: calculadora
+          POSTGRES_PASSWORD: calculadora_ci
+          POSTGRES_DB: calculadora_fiscal_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U calculadora"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -14,5 +27,10 @@ jobs:
           node-version: "22"
       - run: npm install --no-audit --no-fund
       - run: npm run typecheck
-      - run: npm test
+      - name: Testes (PGlite em memória)
+        run: npm test
+      - name: Testes de integração contra PostgreSQL real
+        run: npm test -- --project api
+        env:
+          TEST_DATABASE_URL: postgres://calculadora:calculadora_ci@localhost:5432/calculadora_fiscal_test
       - run: npm run build

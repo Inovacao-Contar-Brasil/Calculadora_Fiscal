@@ -11,3 +11,8 @@ coverage/
 *.pfx
 *.p12
 *.pem
+
+# Dados locais do PGlite (desenvolvimento sem servidor PostgreSQL)
+.data/
+apps/api/dist/
+apps/web/dist/

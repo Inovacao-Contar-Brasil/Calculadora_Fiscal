@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseNfe, readCents } from "./nfe";
+import { parseNfe, readCents } from "./parser.ts";
 
 // XML sintético destinado exclusivamente aos testes. Nunca utilizar dados de clientes.
 const id = "NFe" + "1".repeat(44);
@@ -25,9 +25,9 @@ describe("parseNfe — leitura sem apuração tributária", () => {
     expect(result.issuer.state).toBe("GO");
     expect(result.recipient.state).toBe("MG");
     expect(result.items).toHaveLength(2);
-    expect(result.items[0].productCents).toBe(10000);
-    expect(result.items[0].declaredTaxes.icmsCents).toBe(1200);
-    expect(result.items[1].declaredTaxes.csosn).toBe("102");
+    expect(result.items[0]!.productCents).toBe(10000);
+    expect(result.items[0]!.declaredTaxes.icmsCents).toBe(1200);
+    expect(result.items[1]!.declaredTaxes.csosn).toBe("102");
     expect(result.totals.freightCents).toBe(2500);
     expect(result.warnings).toEqual([]);
   });
@@ -37,7 +37,7 @@ describe("parseNfe — leitura sem apuração tributária", () => {
       .replace("<vNF>325.00</vNF>", "<vIPI>10.00</vIPI><vNF>335.00</vNF>")
       .replace("</ICMS></imposto></det>", "</ICMS><IPI><IPITrib><vIPI>10.00</vIPI></IPITrib></IPI></imposto></det>");
     const result = parseNfe(withIpi);
-    expect(result.items[0].declaredTaxes.ipiCents).toBe(1000);
+    expect(result.items[0]!.declaredTaxes.ipiCents).toBe(1000);
     expect(result.totals.ipiCents).toBe(1000);
     expect(result.totals.productCents).toBe(30000);
     expect(result.totals.invoiceCents).toBe(33500);
