@@ -1,0 +1,18 @@
+node_modules/
+dist/
+coverage/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+# Nunca versionar documentos fiscais de clientes.
+*.xml
+*.pfx
+*.p12
+*.pem
+
+# Dados locais do PGlite (desenvolvimento sem servidor PostgreSQL)
+.data/
+apps/api/dist/
+apps/web/dist/
