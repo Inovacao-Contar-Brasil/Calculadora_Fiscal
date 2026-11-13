@@ -90,10 +90,6 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     return reply.code(status).send({ error: { code: (error as { code?: string }).code ?? "HTTP_" + status, message: (error as Error).message } });
   });
 
-  app.setNotFoundHandler((_request, reply) => {
-    reply.code(404).send({ error: { code: "NOT_FOUND", message: "Rota não encontrada." } });
-  });
-
   app.get("/api/health", async () => ({ ok: true, service: "calculadora-fiscal-api", time: new Date().toISOString() }));
 
   await app.register(authRoutes);
@@ -102,15 +98,20 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   await app.register(documentRoutes);
   await app.register(reviewRoutes);
 
+  // Opcional: servir o build do frontend no mesmo origin (SPA com fallback para index.html).
+  const serveWeb = !!deps.config.WEB_DIST_DIR;
   if (deps.config.WEB_DIST_DIR) {
     const fastifyStatic = (await import("@fastify/static")).default;
     const path = await import("node:path");
     await app.register(fastifyStatic, { root: path.resolve(deps.config.WEB_DIST_DIR), wildcard: false });
-    app.setNotFoundHandler((request, reply) => {
-      if (request.url.startsWith("/api/")) return reply.code(404).send({ error: { code: "NOT_FOUND", message: "Rota não encontrada." } });
-      return reply.sendFile("index.html");
-    });
   }
+
+  app.setNotFoundHandler((request, reply) => {
+    if (serveWeb && !request.url.startsWith("/api/") && (request.method === "GET" || request.method === "HEAD")) {
+      return reply.sendFile("index.html");
+    }
+    return reply.code(404).send({ error: { code: "NOT_FOUND", message: "Rota não encontrada." } });
+  });
 
   return app;
 }
