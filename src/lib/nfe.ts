@@ -51,6 +51,7 @@ export interface Invoice {
     insuranceCents: number | null;
     discountCents: number | null;
     otherCents: number | null;
+    ipiCents: number | null;
   };
   warnings: string[];
 }
@@ -210,6 +211,7 @@ export function parseNfe(xml: string): Invoice {
     insuranceCents: money(totalsNode, "vSeg"),
     discountCents: money(totalsNode, "vDesc"),
     otherCents: money(totalsNode, "vOutro"),
+    ipiCents: money(totalsNode, "vIPI"),
   };
   const warnings: string[] = [];
   compare(items, "productCents", totals.productCents, "Produtos", warnings);
@@ -217,6 +219,16 @@ export function parseNfe(xml: string): Invoice {
   compare(items, "insuranceCents", totals.insuranceCents, "Seguro", warnings);
   compare(items, "discountCents", totals.discountCents, "Descontos", warnings);
   compare(items, "otherCents", totals.otherCents, "Outras despesas", warnings);
+  if (totals.ipiCents !== null) {
+    const ipiFromItems = items.reduce(
+      (sum, item) => sum + (item.declaredTaxes.ipiCents ?? 0),
+      0,
+    );
+    if (ipiFromItems !== totals.ipiCents) {
+      warnings.push("IPI: soma declarada nos itens (" + (ipiFromItems / 100).toFixed(2) +
+        ") diverge do total declarado (" + (totals.ipiCents / 100).toFixed(2) + ").");
+    }
+  }
 
   if (totals.invoiceCents === null) warnings.push("Valor total da NF-e ausente ou inválido.");
   const id = field(info, "@_Id");

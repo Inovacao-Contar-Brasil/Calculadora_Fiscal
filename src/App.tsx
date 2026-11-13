@@ -84,6 +84,7 @@ export default function App() {
               <div className="panel"><div className="section-label">Produtos (XML)</div><strong>{money(invoice.totals.productCents)}</strong></div>
               <div className="panel"><div className="section-label">Frete (XML)</div><strong>{money(invoice.totals.freightCents)}</strong></div>
               <div className="panel"><div className="section-label">Descontos (XML)</div><strong>{money(invoice.totals.discountCents)}</strong></div>
+              <div className="panel"><div className="section-label">IPI (XML)</div><strong>{money(invoice.totals.ipiCents)}</strong></div>
               <div className="panel prominent"><div className="section-label">Total NF-e (declarado)</div><strong>{money(invoice.totals.invoiceCents)}</strong></div>
             </div>
 
@@ -98,7 +99,7 @@ export default function App() {
               <div className="tablehead"><div><h3>Produtos identificados</h3><p>{invoice.items.length} {invoice.items.length === 1 ? "item" : "itens"} extraídos · Valores exatamente como declarados na NF-e</p></div></div>
               <div className="tablewrap">
                 <table>
-                  <thead><tr><th>Item / Produto</th><th>NCM / CEST</th><th>CFOP / CST</th><th>Qtd.</th><th>Preço unit. (XML)</th><th>Valor produto</th><th>Frete do item</th><th>ICMS declarado</th><th>ST declarada</th></tr></thead>
+                  <thead><tr><th>Item / Produto</th><th>NCM / CEST</th><th>CFOP / CST</th><th>Qtd.</th><th>Preço unit. (XML)</th><th>Valor produto</th><th>Frete do item</th><th>IPI declarado</th><th>ICMS declarado</th><th>ST declarada</th></tr></thead>
                   <tbody>
                   {invoice.items.map((item) => (
                     <tr key={item.line}>
@@ -109,6 +110,7 @@ export default function App() {
                       <td>{item.unitPrice || "—"}</td>
                       <td>{money(item.productCents)}</td>
                       <td>{money(item.freightCents)}</td>
+                      <td>{money(item.declaredTaxes.ipiCents)}</td>
                       <td>{money(item.declaredTaxes.icmsCents)}</td>
                       <td>{money(item.declaredTaxes.icmsStCents)}</td>
                     </tr>

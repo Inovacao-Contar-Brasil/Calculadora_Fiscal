@@ -32,6 +32,18 @@ describe("parseNfe — leitura sem apuração tributária", () => {
     expect(result.warnings).toEqual([]);
   });
 
+  it("lê e confere o IPI destacado por item e no total sem confundir com valor de produto", () => {
+    const withIpi = base(secondItem)
+      .replace("<vNF>325.00</vNF>", "<vIPI>10.00</vIPI><vNF>335.00</vNF>")
+      .replace("</ICMS></imposto></det>", "</ICMS><IPI><IPITrib><vIPI>10.00</vIPI></IPITrib></IPI></imposto></det>");
+    const result = parseNfe(withIpi);
+    expect(result.items[0].declaredTaxes.ipiCents).toBe(1000);
+    expect(result.totals.ipiCents).toBe(1000);
+    expect(result.totals.productCents).toBe(30000);
+    expect(result.totals.invoiceCents).toBe(33500);
+    expect(result.warnings).toEqual([]);
+  });
+
   it("sinaliza divergência em totais e nunca altera os valores declarados", () => {
     const result = parseNfe(base(secondItem, "301.00"));
     expect(result.totals.productCents).toBe(30100);
