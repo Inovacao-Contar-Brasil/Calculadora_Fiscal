@@ -1,20 +1,26 @@
 import type { FastifyInstance, InjectOptions } from "fastify";
-import { sql } from "drizzle-orm";
 import { buildApp } from "../app.ts";
 import { hashPassword } from "../auth/password.ts";
 import { loadConfig } from "../config.ts";
 import { createDatabase, type DatabaseHandle } from "../db/client.ts";
 import { companies, companyAccess, memberships, organizations, users } from "../db/schema.ts";
 import type { Role } from "../db/schema.ts";
+import { createTestDatabase, type TestDatabase } from "./pg-test-database.ts";
 
 /**
  * Sobe uma API completa sobre um banco limpo. Por padrão usa PGlite em
- * memória; com TEST_DATABASE_URL usa PostgreSQL real (CI), recriando o schema.
+ * memória; com TEST_DATABASE_URL usa PostgreSQL real (CI) em um **banco
+ * exclusivo** criado para este harness e removido no `close()` — ver
+ * `pg-test-database.ts`. Nada é apagado no banco apontado pela URL.
  * Todos os dados são sintéticos.
  */
 export interface Harness {
   app: FastifyInstance;
   db: DatabaseHandle["db"];
+  /** Motor efetivamente usado ("pglite" ou "postgres"). */
+  kind: DatabaseHandle["kind"];
+  /** Reaplica as migrações (deve ser no-op: bootstrap idempotente). */
+  migrate(): Promise<void>;
   close(): Promise<void>;
   createOrg(name: string): Promise<{ id: string }>;
   createUser(input: { email: string; orgId: string; role: Role; name?: string; password?: string }): Promise<{ id: string; email: string; password: string }>;
@@ -27,29 +33,58 @@ export interface Harness {
 export const TEST_PASSWORD = "senha-forte-de-teste-123";
 
 export async function createHarness(envOverrides: Record<string, string> = {}): Promise<Harness> {
-  const url = process.env.TEST_DATABASE_URL;
-  const handle = url ? await createDatabase({ kind: "postgres", url }) : await createDatabase({ kind: "pglite", dataDir: "memory://" });
-  if (url) {
-    await handle.db.execute(sql`drop schema if exists public cascade`);
-    await handle.db.execute(sql`drop schema if exists drizzle cascade`);
-    await handle.db.execute(sql`create schema public`);
+  const adminUrl = process.env.TEST_DATABASE_URL;
+  let testDb: TestDatabase | undefined;
+  let handle: DatabaseHandle | undefined;
+  let app: FastifyInstance | undefined;
+
+  // Libera tudo o que foi criado até aqui, em ordem inversa; usado no close() e em falha de setup.
+  const release = async () => {
+    const errors: unknown[] = [];
+    for (const step of [() => app?.close(), () => handle?.close(), () => testDb?.drop()]) {
+      try {
+        await step();
+      } catch (error) {
+        errors.push(error);
+      }
+    }
+    app = undefined;
+    handle = undefined;
+    testDb = undefined;
+    if (errors.length) throw errors[0];
+  };
+
+  try {
+    if (adminUrl) {
+      testDb = await createTestDatabase(adminUrl);
+      handle = await createDatabase({ kind: "postgres", url: testDb.url });
+    } else {
+      handle = await createDatabase({ kind: "pglite", dataDir: "memory://" });
+    }
+    await handle.migrate();
+
+    const config = loadConfig({
+      NODE_ENV: "test",
+      PGLITE_DIR: "memory://",
+      ALLOWED_ORIGINS: "http://localhost:5173",
+      LOG_LEVEL: "silent",
+      COOKIE_SECURE: "false",
+      SESSION_TTL_HOURS: "1",
+      // Os testes fazem muitos logins em sequência; o limite real é coberto por teste próprio.
+      LOGIN_RATE_LIMIT_MAX: "1000",
+      ...envOverrides,
+    });
+    app = await buildApp({ db: handle.db, config, logger: false });
+    await app.ready();
+  } catch (error) {
+    await release().catch(() => undefined);
+    throw error;
   }
-  await handle.migrate();
 
-  const config = loadConfig({
-    NODE_ENV: "test",
-    PGLITE_DIR: "memory://",
-    ALLOWED_ORIGINS: "http://localhost:5173",
-    LOG_LEVEL: "silent",
-    COOKIE_SECURE: "false",
-    SESSION_TTL_HOURS: "1",
-    // Os testes fazem muitos logins em sequência; o limite real é coberto por teste próprio.
-    LOGIN_RATE_LIMIT_MAX: "1000",
-    ...envOverrides,
-  });
-  const app = await buildApp({ db: handle.db, config, logger: false });
-  await app.ready();
+  return bindHarness(app, handle, release);
+}
 
+function bindHarness(app: FastifyInstance, handle: DatabaseHandle, release: () => Promise<void>): Harness {
   const request: Harness["request"] = async ({ cookie, ...options }) => {
     const headers: Record<string, string> = { ...(options.headers as Record<string, string> | undefined) };
     if (cookie) headers.cookie = cookie;
@@ -67,10 +102,9 @@ export async function createHarness(envOverrides: Record<string, string> = {}): 
   return {
     app,
     db: handle.db,
-    close: async () => {
-      await app.close();
-      await handle.close();
-    },
+    kind: handle.kind,
+    migrate: () => handle.migrate(),
+    close: release,
     async createOrg(name) {
       const [row] = await handle.db.insert(organizations).values({ name, slug: name.toLowerCase().replace(/[^a-z0-9]+/g, "-") + "-" + Math.random().toString(36).slice(2, 8) }).returning();
       return { id: row!.id };

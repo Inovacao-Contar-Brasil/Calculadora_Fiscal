@@ -50,7 +50,7 @@ describe("isolamento entre empresas e organizações", () => {
     expect(imported.status).toBe(201);
     documentA = imported.body.document.id;
   });
-  afterAll(() => h.close());
+  afterAll(() => h?.close());
 
   it("cliente lista apenas as empresas concedidas; staff lista as da própria organização", async () => {
     const a = await h.request({ method: "GET", url: "/api/companies", cookie: cookieA });

@@ -12,7 +12,7 @@ describe("autenticação e sessões", () => {
     await h.createUser({ email: "fiscal@teste.local", orgId, role: "fiscal" });
     await h.createUser({ email: "cliente@teste.local", orgId, role: "cliente" });
   });
-  afterAll(() => h.close());
+  afterAll(() => h?.close());
 
   it("bloqueia operações sem login", async () => {
     expect((await h.request({ method: "GET", url: "/api/auth/me" })).status).toBe(401);

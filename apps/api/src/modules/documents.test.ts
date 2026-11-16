@@ -31,7 +31,7 @@ describe("importação persistente de NF-e, histórico e revisão fiscal", () =>
     cliente = await h.login("cliente@d.local", TEST_PASSWORD);
     fiscal = await h.login("fiscal@d.local", TEST_PASSWORD);
   });
-  afterAll(() => h.close());
+  afterAll(() => h?.close());
 
   it("importa, persiste itens e abre pendências de revisão sem calcular nada", async () => {
     const response = await importXml(xml1(), cliente, company.id, "nota-7001.xml");

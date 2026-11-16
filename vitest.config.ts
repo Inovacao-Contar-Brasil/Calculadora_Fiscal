@@ -16,9 +16,10 @@ export default defineConfig({
           name: "api",
           environment: "node",
           include: ["apps/api/src/**/*.test.ts"],
-          // Cada arquivo de teste sobe seu próprio PGlite em memória; manter em série
-          // evita disputa de CPU com o WASM e deixa a saída legível.
-          fileParallelism: false,
+          // Os arquivos rodam em PARALELO. `fileParallelism` não é aceito dentro de
+          // `projects` (o Vitest ignora sem aviso), por isso cada harness tem banco
+          // próprio: PGlite em memória ou, com TEST_DATABASE_URL, um banco PostgreSQL
+          // exclusivo criado e removido pelo harness (apps/api/src/test/pg-test-database.ts).
           testTimeout: 30_000,
           hookTimeout: 60_000,
         },

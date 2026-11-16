@@ -20,7 +20,7 @@ describe("cadastro fiscal versionado com vigência", () => {
     fiscal = await h.login("fiscal@f.local", TEST_PASSWORD);
     cliente = await h.login("cliente@f.local", TEST_PASSWORD);
   });
-  afterAll(() => h.close());
+  afterAll(() => h?.close());
 
   it("previousDay trata viradas de mês e ano", () => {
     expect(previousDay("2026-07-01")).toBe("2026-06-30");

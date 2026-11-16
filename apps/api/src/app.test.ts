@@ -11,7 +11,7 @@ describe("API servindo o frontend no mesmo origin", () => {
     writeFileSync(path.join(dir, "index.html"), "<!doctype html><title>Calculadora Fiscal</title>");
     h = await createHarness({ WEB_DIST_DIR: dir });
   });
-  afterAll(() => h.close());
+  afterAll(() => h?.close());
 
   it("entrega index.html para rotas da SPA e 404 JSON para API inexistente", async () => {
     const root = await h.request({ method: "GET", url: "/" });
