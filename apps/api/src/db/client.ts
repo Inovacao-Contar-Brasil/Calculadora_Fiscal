@@ -3,7 +3,7 @@ import { migrate as migratePg } from "drizzle-orm/node-postgres/migrator";
 import { drizzle as drizzlePglite } from "drizzle-orm/pglite";
 import { migrate as migratePglite } from "drizzle-orm/pglite/migrator";
 import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import * as schema from "./schema.ts";
@@ -52,6 +52,7 @@ export async function createDatabase(options: DatabaseOptions): Promise<Database
     };
   }
   const { PGlite } = await import("@electric-sql/pglite");
+  ensurePgliteDataDir(options.dataDir);
   const client = await PGlite.create(options.dataDir);
   const db = drizzlePglite(client, { schema });
   return {
@@ -60,6 +61,23 @@ export async function createDatabase(options: DatabaseOptions): Promise<Database
     migrate: () => migratePglite(db, { migrationsFolder }),
     close: () => client.close(),
   };
+}
+
+/**
+ * O PGlite cria apenas o último nível do diretório de dados (mkdir não
+ * recursivo): com o padrão `.data/pglite` e sem `.data`, o primeiro `npm run
+ * db:seed`/`dev` falhava com ENOENT. Criamos a árvore antes, de forma
+ * recursiva — no-op se já existe, então um banco existente nunca é tocado.
+ * Destinos não-disco (`memory://`, `idb://`, `opfs-ahp://`) são ignorados.
+ * Retorna o caminho absoluto criado/garantido, ou null quando não é disco.
+ */
+export function ensurePgliteDataDir(dataDir: string): string | null {
+  let target = dataDir;
+  if (target.startsWith("file://")) target = fileURLToPath(target);
+  else if (/^[a-z][a-z0-9+.-]*:\/\//i.test(target)) return null;
+  const resolved = path.resolve(target);
+  mkdirSync(resolved, { recursive: true });
+  return resolved;
 }
 
 export function databaseOptionsFromEnv(env: { DATABASE_URL?: string; PGLITE_DIR: string }): DatabaseOptions {
