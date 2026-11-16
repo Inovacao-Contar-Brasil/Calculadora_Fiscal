@@ -22,3 +22,16 @@ export const notFound = (message = "Recurso não encontrado.") => new AppError(4
 export const conflict = (message: string, details?: unknown) => new AppError(409, "CONFLICT", message, details);
 export const unprocessable = (message: string, details?: unknown) => new AppError(422, "UNPROCESSABLE", message, details);
 export const badRequest = (message: string, details?: unknown) => new AppError(400, "BAD_REQUEST", message, details);
+
+/**
+ * Para recursos acessados por ID cujo escopo é verificado pela empresa dona:
+ * fora do escopo deve responder exatamente como inexistente (mesmo status e
+ * mensagem) — "Empresa não encontrada." revelaria que o ID existe.
+ * Outros erros (inclusive falhas de banco) são repassados intactos.
+ */
+export function asNotFound(message: string): (error: unknown) => never {
+  return (error) => {
+    if (error instanceof AppError && error.statusCode === 404) throw notFound(message);
+    throw error;
+  };
+}

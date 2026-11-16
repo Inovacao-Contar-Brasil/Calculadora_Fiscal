@@ -9,9 +9,11 @@ import { loadAccessibleCompany, type Company } from "../auth/authorize.ts";
 import type { Principal } from "../auth/session.ts";
 import type { Database } from "../db/client.ts";
 import { nfeDocuments, nfeItems, reviewItems } from "../db/schema.ts";
-import type { ClassificationStatus } from "../db/schema.ts";
-import { badRequest, unprocessable } from "../errors.ts";
+import { AppError, asNotFound, badRequest, notFound, unprocessable } from "../errors.ts";
+
+const DOCUMENT_NOT_FOUND = "Documento não encontrado.";
 import { clientIp, idParams, requireAuth } from "../http.ts";
+import { classificationFor, issueDateOf } from "./classification.ts";
 
 type DocumentRow = typeof nfeDocuments.$inferSelect;
 type ItemRow = typeof nfeItems.$inferSelect;
@@ -65,17 +67,6 @@ export interface ImportResult {
   pendingCount: number;
 }
 
-/** Retorna a classificação a aplicar a um item a partir da decisão vigente (memória) — nunca um cálculo. */
-function statusFromReview(review: typeof reviewItems.$inferSelect | undefined, issueDate: string): ClassificationStatus {
-  if (!review) return "PENDENTE_REVISAO";
-  if (review.status === "HOMOLOGADO" || review.status === "REJEITADO") {
-    const startsBefore = !review.validFrom || review.validFrom <= issueDate;
-    const endsAfter = !review.validTo || review.validTo >= issueDate;
-    return startsBefore && endsAfter ? review.status : "PENDENTE_REVISAO";
-  }
-  return review.status;
-}
-
 /**
  * Importa uma NF-e para a empresa. Idempotente por (empresa, chave de acesso):
  * reimportar a mesma nota devolve o documento já existente, sem gravar nada.
@@ -99,8 +90,8 @@ export async function importNfe(
     throw unprocessable("O destinatário da NF-e (" + invoice.recipient.document + ") não corresponde ao CNPJ da empresa selecionada.");
   }
 
-  const sha256 = createHash("sha256").update(rawXml, "utf8").digest("hex");
-  const issueDate = invoice.issuedAt.slice(0, 10);
+  const sha256 = sha256Hex(rawXml);
+  const issueDate = issueDateOf(invoice.issuedAt);
 
   const findExisting = () =>
     db
@@ -186,7 +177,7 @@ export async function importNfe(
           }
           byFingerprint.set(fingerprint, review);
         }
-        const status = statusFromReview(review, issueDate);
+        const status = classificationFor(review, issueDate);
         if (status !== "HOMOLOGADO") pendingCount += 1;
         await tx.insert(nfeItems).values({
           documentId: doc!.id,
@@ -236,6 +227,10 @@ export async function importNfe(
     if (raced) return { document: raced, duplicate: true, contentDiffers: raced.sha256 !== sha256, pendingCount: await countPending(db, raced.id) };
     throw error;
   }
+}
+
+function sha256Hex(content: string): string {
+  return createHash("sha256").update(content, "utf8").digest("hex");
 }
 
 async function countPending(db: Database, documentId: string): Promise<number> {
@@ -288,19 +283,31 @@ export async function documentRoutes(fastify: FastifyInstance): Promise<void> {
   app.get("/api/documents/:id", { schema: { params: idParams } }, async (request) => {
     const principal = requireAuth(request);
     const doc = (await app.db.select().from(nfeDocuments).where(eq(nfeDocuments.id, request.params.id)).limit(1))[0];
-    // Verifica o escopo pela empresa do documento; fora dele, 404.
-    const { company } = await loadAccessibleCompany(app.db, principal, doc?.companyId ?? "00000000-0000-0000-0000-000000000000");
-    const items = await app.db.select().from(nfeItems).where(eq(nfeItems.documentId, doc!.id)).orderBy(nfeItems.line);
-    return { document: documentView(doc!), company: { id: company.id, legalName: company.legalName }, items: items.map(itemView) };
+    if (!doc) throw notFound(DOCUMENT_NOT_FOUND);
+    // Verifica o escopo pela empresa do documento; fora dele, 404 (mesma resposta de inexistente).
+    const { company } = await loadAccessibleCompany(app.db, principal, doc.companyId).catch(asNotFound(DOCUMENT_NOT_FOUND));
+    const items = await app.db.select().from(nfeItems).where(eq(nfeItems.documentId, doc.id)).orderBy(nfeItems.line);
+    return { document: documentView(doc), company: { id: company.id, legalName: company.legalName }, items: items.map(itemView) };
   });
 
   app.get("/api/documents/:id/xml", { schema: { params: idParams } }, async (request, reply) => {
     const principal = requireAuth(request);
     const doc = (await app.db.select().from(nfeDocuments).where(eq(nfeDocuments.id, request.params.id)).limit(1))[0];
-    const { company } = await loadAccessibleCompany(app.db, principal, doc?.companyId ?? "00000000-0000-0000-0000-000000000000");
-    await audit(app.db, { actorUserId: principal.userId, organizationId: company.organizationId, companyId: company.id, action: "NFE_XML_DOWNLOADED", entityType: "nfe_document", entityId: doc!.id, ip: clientIp(request) });
+    if (!doc) throw notFound(DOCUMENT_NOT_FOUND);
+    const { company } = await loadAccessibleCompany(app.db, principal, doc.companyId).catch(asNotFound(DOCUMENT_NOT_FOUND));
+    // Integridade: o XML entregue tem de ser byte a byte o recebido na importação.
+    // Divergência indica corrupção ou adulteração no banco — não entregar, registrar.
+    const actual = sha256Hex(doc.rawXml);
+    if (actual !== doc.sha256) {
+      await audit(app.db, { actorUserId: principal.userId, organizationId: company.organizationId, companyId: company.id, action: "NFE_INTEGRITY_FAILURE", entityType: "nfe_document", entityId: doc.id, metadata: { expected: doc.sha256, actual }, ip: clientIp(request) });
+      request.log.error({ documentId: doc.id }, "falha de integridade do XML armazenado");
+      throw new AppError(409, "INTEGRITY_FAILURE", "O XML armazenado não confere com o hash registrado na importação. A equipe técnica foi notificada.");
+    }
+    await audit(app.db, { actorUserId: principal.userId, organizationId: company.organizationId, companyId: company.id, action: "NFE_XML_DOWNLOADED", entityType: "nfe_document", entityId: doc.id, ip: clientIp(request) });
     reply.header("Content-Type", "application/xml; charset=utf-8");
-    reply.header("Content-Disposition", 'attachment; filename="' + doc!.accessKey + '.xml"');
-    return doc!.rawXml;
+    reply.header("Content-Disposition", 'attachment; filename="' + doc.accessKey + '.xml"');
+    reply.header("X-Content-SHA256", doc.sha256);
+    reply.header("Cache-Control", "no-store");
+    return doc.rawXml;
   });
 }

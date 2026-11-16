@@ -1,5 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createHarness, TEST_PASSWORD, type Harness } from "../test/harness.ts";
+import { eq } from "drizzle-orm";
+import { auditEvents, nfeDocuments } from "../db/schema.ts";
 import { ITEM_PASTILHA, syntheticCnpj, syntheticNfe } from "../test/fixtures.ts";
 
 /**
@@ -19,6 +21,7 @@ describe("isolamento entre empresas e organizações", () => {
   let cookieFiscal2: string;
   let cookieAdmin1: string;
   let documentA: string;
+  let xmlA: string;
 
   beforeAll(async () => {
     h = await createHarness();
@@ -40,12 +43,13 @@ describe("isolamento entre empresas e organizações", () => {
     cookieFiscal2 = await h.login("fiscal@org2.local", TEST_PASSWORD);
     cookieAdmin1 = await h.login("admin@org1.local", TEST_PASSWORD);
 
+    xmlA = syntheticNfe({ number: "1001", recipientCnpj: companyA.cnpj, items: [ITEM_PASTILHA] });
     const imported = await h.request({
       method: "POST",
       url: "/api/companies/" + companyA.id + "/documents",
       cookie: cookieA,
       headers: { "content-type": "application/xml" },
-      payload: syntheticNfe({ number: "1001", recipientCnpj: companyA.cnpj, items: [ITEM_PASTILHA] }),
+      payload: xmlA,
     });
     expect(imported.status).toBe(201);
     documentA = imported.body.document.id;
@@ -123,5 +127,69 @@ describe("isolamento entre empresas e organizações", () => {
     expect((await h.request({ method: "GET", url: "/api/companies/" + companyA.id, cookie: cookieB })).status).toBe(200);
     expect((await h.request({ method: "DELETE", url: "/api/companies/" + companyA.id + "/access/" + insider, cookie: cookieAdmin1 })).status).toBe(200);
     expect((await h.request({ method: "GET", url: "/api/companies/" + companyA.id, cookie: cookieB })).status).toBe(404);
+  });
+
+  it("fora do escopo responde igual a inexistente (mesmo status e mensagem): sem oráculo de existência", async () => {
+    const missing = "00000000-0000-4000-8000-000000000000";
+    const pairs: [string, string][] = [
+      ["/api/documents/" + documentA, "/api/documents/" + missing],
+      ["/api/documents/" + documentA + "/xml", "/api/documents/" + missing + "/xml"],
+    ];
+    const reviewId = (await h.request({ method: "GET", url: "/api/review-items", cookie: cookieA })).body.items[0].id;
+    pairs.push(["/api/review-items/" + reviewId, "/api/review-items/" + missing]);
+    for (const [existing, absent] of pairs) {
+      const outOfScope = await h.request({ method: "GET", url: existing, cookie: cookieB });
+      const notThere = await h.request({ method: "GET", url: absent, cookie: cookieB });
+      expect(outOfScope.status, existing).toBe(404);
+      expect(outOfScope.body, existing).toEqual(notThere.body);
+    }
+  });
+
+  it("decisões de revisão: cliente sem acesso e outra organização recebem 404; cliente com acesso recebe 403", async () => {
+    const reviewId = (await h.request({ method: "GET", url: "/api/review-items", cookie: cookieA })).body.items[0].id;
+    const reopen = { validTo: "2026-12-31", reason: "teste de escopo" };
+    // Cliente B é da mesma organização, mas sem acesso à empresa A: não pode saber que o item existe.
+    expect((await h.request({ method: "PATCH", url: "/api/review-items/" + reviewId, cookie: cookieB, payload: { status: "PENDENTE_REVISAO" } })).status).toBe(404);
+    expect((await h.request({ method: "POST", url: "/api/review-items/" + reviewId + "/reopen", cookie: cookieB, payload: reopen })).status).toBe(404);
+    expect((await h.request({ method: "POST", url: "/api/review-items/" + reviewId + "/reopen", cookie: cookieFiscal2, payload: reopen })).status).toBe(404);
+    // Cliente A vê o item, mas não decide.
+    expect((await h.request({ method: "POST", url: "/api/review-items/" + reviewId + "/reopen", cookie: cookieA, payload: reopen })).status).toBe(403);
+  });
+
+  it("XML devolvido é byte a byte o importado, com hash, sem cache, e o download é auditado", async () => {
+    const response = await h.request({ method: "GET", url: "/api/documents/" + documentA + "/xml", cookie: cookieA });
+    expect(response.status).toBe(200);
+    expect(response.raw).toBe(xmlA);
+    const [doc] = await h.db.select().from(nfeDocuments).where(eq(nfeDocuments.id, documentA));
+    expect(response.headers["x-content-sha256"]).toBe(doc!.sha256);
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(String(response.headers["content-disposition"])).toBe('attachment; filename="' + doc!.accessKey + '.xml"');
+    const events = await h.db.select().from(auditEvents).where(eq(auditEvents.entityId, documentA));
+    expect(events.some((e) => e.action === "NFE_XML_DOWNLOADED")).toBe(true);
+  });
+
+  it("XML adulterado no banco não é entregue e a falha de integridade é auditada", async () => {
+    const xml = syntheticNfe({ number: "1003", recipientCnpj: companyA.cnpj, items: [ITEM_PASTILHA] });
+    const imported = await h.request({ method: "POST", url: "/api/companies/" + companyA.id + "/documents", cookie: cookieA, headers: { "content-type": "application/xml" }, payload: xml });
+    const id = imported.body.document.id as string;
+    const tampered = xml.replace("Pastilha de freio", "Pastilha adulterada");
+    expect(tampered).not.toBe(xml);
+    await h.db.update(nfeDocuments).set({ rawXml: tampered }).where(eq(nfeDocuments.id, id));
+    const response = await h.request({ method: "GET", url: "/api/documents/" + id + "/xml", cookie: cookieA });
+    expect(response.status).toBe(409);
+    expect(response.body.error.code).toBe("INTEGRITY_FAILURE");
+    expect(response.raw).not.toContain("adulterada");
+    const events = await h.db.select().from(auditEvents).where(eq(auditEvents.entityId, id));
+    expect(events.map((e) => e.action)).toContain("NFE_INTEGRITY_FAILURE");
+    expect(events.map((e) => e.action)).not.toContain("NFE_XML_DOWNLOADED");
+  });
+
+  it("revogar o acesso encerra a leitura de documentos e XML na sessão já aberta", async () => {
+    const insider = (await h.request({ method: "GET", url: "/api/auth/me", cookie: cookieB })).body.user.id;
+    await h.request({ method: "POST", url: "/api/companies/" + companyA.id + "/access", cookie: cookieAdmin1, payload: { userId: insider } });
+    expect((await h.request({ method: "GET", url: "/api/documents/" + documentA + "/xml", cookie: cookieB })).status).toBe(200);
+    await h.request({ method: "DELETE", url: "/api/companies/" + companyA.id + "/access/" + insider, cookie: cookieAdmin1 });
+    expect((await h.request({ method: "GET", url: "/api/documents/" + documentA, cookie: cookieB })).status).toBe(404);
+    expect((await h.request({ method: "GET", url: "/api/documents/" + documentA + "/xml", cookie: cookieB })).status).toBe(404);
   });
 });

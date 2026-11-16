@@ -3,12 +3,16 @@ import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { audit } from "../audit/audit.ts";
-import { isStaff, listVisibleCompanies, loadAccessibleCompany, requireRole } from "../auth/authorize.ts";
+import { isStaff, listVisibleCompanies, loadAccessibleCompany } from "../auth/authorize.ts";
 import type { Database } from "../db/client.ts";
 import { classificationStatusEnum, companies, nfeDocuments, nfeItems, reviewItems } from "../db/schema.ts";
 import type { ClassificationStatus } from "../db/schema.ts";
-import { notFound, unprocessable } from "../errors.ts";
+import type { Principal } from "../auth/session.ts";
+import { asNotFound, conflict, forbidden, notFound, unprocessable } from "../errors.ts";
+
+const REVIEW_NOT_FOUND = "Item de revisão não encontrado.";
 import { clientIp, idParams, isoDate, requireAuth } from "../http.ts";
+import { classificationFor, issueDateOf } from "./classification.ts";
 
 type ReviewRow = typeof reviewItems.$inferSelect;
 
@@ -92,21 +96,22 @@ export async function reviewRoutes(fastify: FastifyInstance): Promise<void> {
   app.get("/api/review-items/:id", { schema: { params: idParams } }, async (request) => {
     const principal = requireAuth(request);
     const row = (await app.db.select().from(reviewItems).where(eq(reviewItems.id, request.params.id)).limit(1))[0];
-    const { company } = await loadAccessibleCompany(app.db, principal, row?.companyId ?? "00000000-0000-0000-0000-000000000000");
+    if (!row) throw notFound(REVIEW_NOT_FOUND);
+    const { company } = await loadAccessibleCompany(app.db, principal, row.companyId).catch(asNotFound(REVIEW_NOT_FOUND));
     const occurrences = await app.db
       .select({ documentId: nfeDocuments.id, number: nfeDocuments.number, issuedAt: nfeDocuments.issuedAt, issuerName: nfeDocuments.issuerName, line: nfeItems.line, productCents: nfeItems.productCents, classificationStatus: nfeItems.classificationStatus })
       .from(nfeItems)
       .innerJoin(nfeDocuments, eq(nfeDocuments.id, nfeItems.documentId))
-      .where(eq(nfeItems.reviewItemId, row!.id))
+      .where(eq(nfeItems.reviewItemId, row.id))
       .orderBy(desc(nfeDocuments.importedAt))
       .limit(50);
     // Versões anteriores (decisões encerradas) do mesmo produto nesta empresa.
     const history = await app.db
       .select()
       .from(reviewItems)
-      .where(and(eq(reviewItems.companyId, company.id), eq(reviewItems.fingerprint, row!.fingerprint), sql`${reviewItems.id} <> ${row!.id}`))
+      .where(and(eq(reviewItems.companyId, company.id), eq(reviewItems.fingerprint, row.fingerprint), sql`${reviewItems.id} <> ${row.id}`))
       .orderBy(desc(reviewItems.createdAt));
-    return { item: reviewView(row!), company: { id: company.id, legalName: company.legalName }, occurrences, history: history.map(reviewView) };
+    return { item: reviewView(row), company: { id: company.id, legalName: company.legalName }, occurrences, history: history.map(reviewView) };
   });
 
   app.patch(
@@ -129,10 +134,7 @@ export async function reviewRoutes(fastify: FastifyInstance): Promise<void> {
     },
     async (request) => {
       const principal = requireAuth(request);
-      const row = (await app.db.select().from(reviewItems).where(eq(reviewItems.id, request.params.id)).limit(1))[0];
-      if (!row) throw notFound();
-      const role = requireRole(principal, row.organizationId, ["admin", "fiscal"]);
-      if (!isStaff(role)) throw notFound();
+      const row = await loadReviewForStaff(app.db, principal, request.params.id);
       if (row.validTo !== null) throw unprocessable("Esta decisão já foi encerrada; reabra o item para nova análise.");
       if (!TRANSITIONS[row.status].includes(request.body.status)) {
         throw unprocessable("Transição de " + row.status + " para " + request.body.status + " não é permitida.");
@@ -151,13 +153,11 @@ export async function reviewRoutes(fastify: FastifyInstance): Promise<void> {
             validFrom: isFinal ? (request.body.validFrom ?? new Date().toISOString().slice(0, 10)) : null,
             updatedAt: new Date(),
           })
-          .where(eq(reviewItems.id, row.id))
+          // Concorrência otimista: só aplica se ninguém mudou o item desde a leitura.
+          .where(and(eq(reviewItems.id, row.id), eq(reviewItems.status, row.status), isNull(reviewItems.validTo)))
           .returning();
-        if (isFinal) {
-          // Propaga o status aos itens de NF-e já vinculados a este produto.
-          await tx.update(nfeItems).set({ classificationStatus: request.body.status }).where(eq(nfeItems.reviewItemId, row.id));
-          await refreshDocumentStatuses(tx, row.id);
-        }
+        if (!next) throw conflict("O item foi alterado por outra pessoa. Recarregue e tente novamente.");
+        await applyReviewToItems(tx, next);
         await audit(tx, {
           actorUserId: principal.userId,
           organizationId: row.organizationId,
@@ -183,13 +183,16 @@ export async function reviewRoutes(fastify: FastifyInstance): Promise<void> {
     { schema: { params: idParams, body: z.object({ validTo: isoDate, reason: z.string().trim().min(3).max(2000) }) } },
     async (request, reply) => {
       const principal = requireAuth(request);
-      const row = (await app.db.select().from(reviewItems).where(eq(reviewItems.id, request.params.id)).limit(1))[0];
-      if (!row) throw notFound();
-      requireRole(principal, row.organizationId, ["admin", "fiscal"]);
+      const row = await loadReviewForStaff(app.db, principal, request.params.id);
       if (row.validTo !== null) throw unprocessable("Este item já está encerrado.");
       if (row.validFrom && request.body.validTo < row.validFrom) throw unprocessable("O fim da vigência não pode ser anterior ao início.");
       const created = await app.db.transaction(async (tx) => {
-        await tx.update(reviewItems).set({ validTo: request.body.validTo, updatedAt: new Date() }).where(eq(reviewItems.id, row.id));
+        const [closed] = await tx
+          .update(reviewItems)
+          .set({ validTo: request.body.validTo, updatedAt: new Date() })
+          .where(and(eq(reviewItems.id, row.id), isNull(reviewItems.validTo)))
+          .returning();
+        if (!closed) throw conflict("O item já foi encerrado por outra pessoa. Recarregue e tente novamente.");
         const [next] = await tx
           .insert(reviewItems)
           .values({
@@ -233,6 +236,45 @@ export async function reviewRoutes(fastify: FastifyInstance): Promise<void> {
       return { item: reviewView(created) };
     },
   );
+}
+
+/**
+ * Carrega o item de revisão para uma decisão do escritório. Ordem importa:
+ * primeiro o escopo (fora dele = 404, sem revelar existência, inclusive para
+ * cliente da mesma organização sem acesso à empresa), depois o papel (403).
+ */
+async function loadReviewForStaff(db: Database, principal: Principal, id: string): Promise<ReviewRow> {
+  const row = (await db.select().from(reviewItems).where(eq(reviewItems.id, id)).limit(1))[0];
+  if (!row) throw notFound(REVIEW_NOT_FOUND);
+  const { role } = await loadAccessibleCompany(db, principal, row.companyId).catch(asNotFound(REVIEW_NOT_FOUND));
+  if (!isStaff(role)) throw forbidden();
+  return row;
+}
+
+/**
+ * Propaga a decisão aos itens de NF-e vinculados usando a MESMA regra da
+ * importação (`classificationFor`). Antes: estados de fluxo (EM_ANALISE) não
+ * eram propagados — itens importados antes e depois da mudança ficavam com
+ * status diferentes — e HOMOLOGADO era aplicado a todas as notas, ignorando a
+ * vigência que a importação respeitava.
+ */
+async function applyReviewToItems(tx: Database, review: ReviewRow): Promise<void> {
+  const linked = await tx
+    .select({ id: nfeItems.id, issuedAt: nfeDocuments.issuedAt })
+    .from(nfeItems)
+    .innerJoin(nfeDocuments, eq(nfeDocuments.id, nfeItems.documentId))
+    .where(eq(nfeItems.reviewItemId, review.id));
+  const byStatus = new Map<ClassificationStatus, string[]>();
+  for (const item of linked) {
+    const status = classificationFor(review, issueDateOf(item.issuedAt));
+    byStatus.set(status, [...(byStatus.get(status) ?? []), item.id]);
+  }
+  for (const [status, ids] of byStatus) {
+    for (let i = 0; i < ids.length; i += 500) {
+      await tx.update(nfeItems).set({ classificationStatus: status }).where(inArray(nfeItems.id, ids.slice(i, i + 500)));
+    }
+  }
+  await refreshDocumentStatuses(tx, review.id);
 }
 
 /** Recalcula o status dos documentos que contêm itens ligados ao review item. */
