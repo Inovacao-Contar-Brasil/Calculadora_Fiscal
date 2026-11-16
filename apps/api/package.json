@@ -9,6 +9,7 @@
     "build": "node scripts/build.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "db:generate": "drizzle-kit generate",
+    "db:check": "drizzle-kit check",
     "db:seed": "tsx --env-file-if-exists=.env src/db/seed.ts"
   },
   "dependencies": {

@@ -25,7 +25,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - run: npm install --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
+      - name: Auditoria de dependências de produção (falha em high/critical)
+        # Dependências de desenvolvimento têm risco residual documentado em docs/SEGURANCA.md.
+        run: npm audit --omit=dev --audit-level=high
+      - name: Migrações coerentes com o histórico (drizzle-kit check)
+        run: npm run db:check
       - run: npm run typecheck
       - name: Testes (PGlite em memória)
         run: npm test

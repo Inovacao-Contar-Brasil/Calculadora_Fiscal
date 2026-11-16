@@ -15,7 +15,30 @@ npm run db:seed                          # cria organização e primeiro admin
 npm run dev                              # API em http://127.0.0.1:3333, web em http://localhost:5173
 ```
 
-Com PostgreSQL real: defina `DATABASE_URL` no `.env`. Em produção ela é obrigatória.
+Sem `DATABASE_URL`, os dados ficam em `apps/api/.data/pglite` (criada automaticamente no primeiro uso; apagar a pasta zera o banco local). Com PostgreSQL real: defina `DATABASE_URL` no `.env`. Em produção ela é obrigatória.
+
+### Windows (PowerShell)
+
+O PowerShell pode bloquear `npm.ps1`; use `npm.cmd`:
+
+```powershell
+npm.cmd ci
+Copy-Item apps/api/.env.example apps/api/.env
+npm.cmd run db:seed
+npm.cmd run dev:api     # terminal 1
+npm.cmd run dev:web     # terminal 2
+npm.cmd run verify
+```
+
+No Windows o npm executa scripts com `cmd.exe`, onde o `&`/`wait` do script `dev` não sobe API e web em paralelo — por isso os dois terminais.
+
+### Testes contra PostgreSQL real
+
+```bash
+TEST_DATABASE_URL=postgres://usuario:senha@localhost:5432/qualquer_banco npm test -- --project api
+```
+
+A URL é usada só como conexão administrativa: cada suíte cria um banco exclusivo `cf_test_*`, aplica as migrações e o remove ao terminar. **Nada é apagado no banco apontado pela URL.** O usuário precisa do privilégio `CREATEDB`. Se um processo for morto no meio, pode sobrar um `cf_test_*`; remova manualmente.
 
 Verificação completa (obrigatória antes de commit):
 
