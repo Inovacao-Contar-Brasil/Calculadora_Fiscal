@@ -1,4 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { eq } from "drizzle-orm";
+import { auditEvents } from "../db/schema.ts";
 import { createHarness, TEST_PASSWORD, type Harness } from "../test/harness.ts";
 
 describe("autenticação e sessões", () => {
@@ -109,8 +111,29 @@ describe("autenticação e sessões", () => {
     const cookie = await h.login("cliente@teste.local", TEST_PASSWORD);
     expect((await h.request({ method: "POST", url: "/api/auth/password", cookie, payload: { currentPassword: "errada", newPassword: "nova-senha-forte-789" } })).status).toBe(401);
     expect((await h.request({ method: "POST", url: "/api/auth/password", cookie, payload: { currentPassword: TEST_PASSWORD, newPassword: "fraca" } })).status).toBe(422);
-    expect((await h.request({ method: "POST", url: "/api/auth/password", cookie, payload: { currentPassword: TEST_PASSWORD, newPassword: "nova-senha-forte-789" } })).status).toBe(200);
+    const other = await h.login("cliente@teste.local", TEST_PASSWORD);
+    const changed = await h.request({ method: "POST", url: "/api/auth/password", cookie, payload: { currentPassword: TEST_PASSWORD, newPassword: "nova-senha-forte-789" } });
+    expect(changed.status).toBe(200);
+    expect(String(changed.headers["set-cookie"])).toMatch(/cf_session=;/);
+    // Todas as sessões são encerradas, inclusive a usada na troca.
+    expect((await h.request({ method: "GET", url: "/api/auth/me", cookie })).status).toBe(401);
+    expect((await h.request({ method: "GET", url: "/api/auth/me", cookie: other })).status).toBe(401);
+    const actions = (await h.db.select().from(auditEvents).where(eq(auditEvents.action, "PASSWORD_CHANGE_FAILED"))).length;
+    expect(actions).toBeGreaterThanOrEqual(1);
     await expect(h.login("cliente@teste.local", TEST_PASSWORD)).rejects.toThrow(/401/);
     expect(await h.login("cliente@teste.local", "nova-senha-forte-789")).toMatch(/^cf_session=/);
+  });
+
+  it("CSRF: sem Origin, recusa Sec-Fetch-Site cross-site e aceita same-origin", async () => {
+    const cookie = await h.login("fiscal@teste.local", TEST_PASSWORD);
+    const crossSite = await h.request({ method: "POST", url: "/api/auth/logout", cookie, headers: { "sec-fetch-site": "cross-site" } });
+    expect(crossSite.status).toBe(403);
+    expect(crossSite.body.error.code).toBe("FORBIDDEN_ORIGIN");
+    expect((await h.request({ method: "GET", url: "/api/auth/me", cookie })).status).toBe(200);
+    const evil = await h.request({ method: "POST", url: "/api/auth/logout", cookie, headers: { origin: "https://site-malicioso.example" } });
+    expect(evil.status).toBe(403);
+    const sameOrigin = await h.request({ method: "POST", url: "/api/auth/logout", cookie, headers: { "sec-fetch-site": "same-origin" } });
+    expect(sameOrigin.status).toBe(200);
+    expect((await h.request({ method: "GET", url: "/api/auth/me", cookie })).status).toBe(401);
   });
 });

@@ -64,11 +64,16 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   });
 
   // Defesa CSRF: cookie SameSite=Strict + verificação de Origin em métodos mutáveis.
+  // Sem Origin (clientes não-navegador, alguns navegadores antigos), recorre ao
+  // Sec-Fetch-Site: navegadores modernos o enviam sempre e "cross-site" é recusado.
   app.addHook("onRequest", async (request, reply) => {
     if (!MUTATING.has(request.method)) return;
     const origin = request.headers.origin;
-    if (origin && !deps.config.allowedOrigins.includes(origin) && origin !== request.protocol + "://" + request.host) {
-      reply.code(403).send({ error: { code: "FORBIDDEN_ORIGIN", message: "Origem não permitida." } });
+    const forbiddenOrigin = origin
+      ? !deps.config.allowedOrigins.includes(origin) && origin !== request.protocol + "://" + request.host
+      : request.headers["sec-fetch-site"] === "cross-site";
+    if (forbiddenOrigin) {
+      return reply.code(403).send({ error: { code: "FORBIDDEN_ORIGIN", message: "Origem não permitida." } });
     }
   });
 

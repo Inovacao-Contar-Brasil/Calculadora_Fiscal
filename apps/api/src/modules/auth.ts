@@ -38,18 +38,25 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
         await audit(app.db, { actorUserId: null, organizationId: null, action: "LOGIN_FAILED", entityType: "user", entityId: user?.id ?? null, ip: clientIp(request), metadata: { emailDomain: email.split("@")[1] ?? null } });
         throw unauthorized("E-mail ou senha inválidos.");
       }
-      const session = await createSession(app.db, user.id, app.config.SESSION_TTL_HOURS, { ip: clientIp(request), userAgent: request.headers["user-agent"] ?? null });
-      await app.db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, user.id));
-      await audit(app.db, { actorUserId: user.id, organizationId: null, action: "LOGIN", entityType: "user", entityId: user.id, ip: clientIp(request) });
+      // Sessão, último acesso e auditoria são atômicos: não existe sessão sem registro de LOGIN.
+      const session = await app.db.transaction(async (tx) => {
+        const created = await createSession(tx, user.id, app.config.SESSION_TTL_HOURS, { ip: clientIp(request), userAgent: request.headers["user-agent"] ?? null });
+        await tx.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, user.id));
+        await audit(tx, { actorUserId: user.id, organizationId: null, action: "LOGIN", entityType: "user", entityId: user.id, ip: clientIp(request) });
+        return created;
+      });
       reply.setCookie(SESSION_COOKIE, session.token, cookieOptions());
       return { user: { id: user.id, email: user.email, name: user.name }, expiresAt: session.expiresAt.toISOString() };
     },
   );
 
   app.post("/api/auth/logout", async (request, reply) => {
-    if (request.principal) {
-      await revokeSession(app.db, request.principal.sessionId);
-      await audit(app.db, { actorUserId: request.principal.userId, organizationId: null, action: "LOGOUT", entityType: "user", entityId: request.principal.userId, ip: clientIp(request) });
+    const principal = request.principal;
+    if (principal) {
+      await app.db.transaction(async (tx) => {
+        await revokeSession(tx, principal.sessionId);
+        await audit(tx, { actorUserId: principal.userId, organizationId: null, action: "LOGOUT", entityType: "user", entityId: principal.userId, ip: clientIp(request) });
+      });
     }
     reply.clearCookie(SESSION_COOKIE, { path: "/" });
     return { ok: true };
@@ -71,17 +78,28 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
 
   app.post(
     "/api/auth/password",
-    { schema: { body: z.object({ currentPassword: z.string().min(1).max(256), newPassword: z.string().min(1).max(256) }) } },
-    async (request) => {
+    {
+      // Com uma sessão roubada, a senha atual vira alvo de força bruta: mesmo limite do login.
+      config: { rateLimit: { max: app.config.LOGIN_RATE_LIMIT_MAX, timeWindow: "1 minute" } },
+      schema: { body: z.object({ currentPassword: z.string().min(1).max(256), newPassword: z.string().min(1).max(256) }) },
+    },
+    async (request, reply) => {
       const principal = requireAuth(request);
       const user = (await app.db.select().from(users).where(eq(users.id, principal.userId)).limit(1))[0];
-      if (!user || !(await verifyPassword(request.body.currentPassword, user.passwordHash))) throw unauthorized("Senha atual incorreta.");
+      if (!user || !(await verifyPassword(request.body.currentPassword, user.passwordHash))) {
+        await audit(app.db, { actorUserId: principal.userId, organizationId: null, action: "PASSWORD_CHANGE_FAILED", entityType: "user", entityId: principal.userId, ip: clientIp(request) });
+        throw unauthorized("Senha atual incorreta.");
+      }
       const policyError = validatePasswordPolicy(request.body.newPassword);
       if (policyError) throw unprocessable(policyError);
-      await app.db.update(users).set({ passwordHash: await hashPassword(request.body.newPassword) }).where(eq(users.id, user.id));
-      // Encerra as demais sessões; a atual continua válida até expirar.
-      await revokeAllUserSessions(app.db, user.id);
-      await audit(app.db, { actorUserId: user.id, organizationId: null, action: "PASSWORD_CHANGED", entityType: "user", entityId: user.id, ip: clientIp(request) });
+      const passwordHash = await hashPassword(request.body.newPassword);
+      // Troca de senha, revogação de TODAS as sessões (inclusive a atual) e auditoria são atômicas.
+      await app.db.transaction(async (tx) => {
+        await tx.update(users).set({ passwordHash }).where(eq(users.id, user.id));
+        await revokeAllUserSessions(tx, user.id);
+        await audit(tx, { actorUserId: user.id, organizationId: null, action: "PASSWORD_CHANGED", entityType: "user", entityId: user.id, ip: clientIp(request) });
+      });
+      reply.clearCookie(SESSION_COOKIE, { path: "/" });
       return { ok: true, note: "Senha alterada. Faça login novamente." };
     },
   );
