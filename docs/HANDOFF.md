@@ -1,71 +1,91 @@
 # HANDOFF — continuidade entre sessões
 
-> Leia junto com `CLAUDE.md`. Atualize este arquivo após cada marco e antes de encerrar a sessão.
+> Leia junto com `CLAUDE.md`. Atualize este arquivo após cada marco e antes de encerrar a sessão. Não dependa do histórico de nenhuma conversa: tudo o que importa está aqui, nos commits e nas Issues.
 
-## Objetivo da sprint
+## Situação em 16/11/2026
 
-**Sprint 1 — Fundação SaaS segura** (Issue #2): autenticação e sessões; papéis `admin`/`fiscal`/`cliente` com isolamento por organização e empresa; cadastro fiscal versionado com vigência e auditoria; importação persistente de XML de NF-e com deduplicação; histórico; fila de revisão (`PENDENTE_REVISAO`) sem cálculo tributário; estrutura de domínio pronta para o motor tributário e para o Hub.
+- **Sprint 1 (Issue #2):** fundação implementada. **Gate de qualidade (Issue #5): CI verde no PostgreSQL real**, vulnerabilidades tratadas, PGlite corrigido, revisão de segurança feita. Falta só o que depende de pessoas (ver "Pendências").
+- **Sprint 2A (Issue #6):** especificação pronta em `docs/SPRINT2A_ESPECIFICACAO.md` + `docs/adr/ADR-007` (proposta). **Nenhum código da 2A foi escrito** — aguarda revisão de Henrique/Iza/Edson.
+- **PR:** [Inovacao-Contar-Brasil/Calculadora_Fiscal#7](https://github.com/Inovacao-Contar-Brasil/Calculadora_Fiscal/pull/7) — **draft**, base `main`, sem merge. Contém também os commits do PR #1 (sobreposição a resolver na revisão).
 
-## Estado
+## Branch e commits
 
-- **Branch de trabalho:** `feat/sprint1-fundacao-segura` (criada a partir de `origin/feat/fundacao-importacao-nfe`, o PR #1, que continua aberto e **não** foi mergeado).
-- **Base:** `main` tem só o README inicial (`82b7497`). O PR #1 tem `d3bb210` e `1f62c4f`.
-- **Commits desta sprint (em ordem):**
-  1. `9f54287` chore: monorepo + pacote de domínio + contratos do motor tributário
-  2. `bc61554` feat(api): fundação segura (auth, RBAC, cadastro fiscal, importação, revisão)
-  3. `71cceec` feat(web): SPA autenticada
-  4. (este commit) docs: ADRs, CLAUDE.md, HANDOFF, segurança, README, arquitetura
-- **Push:** ainda **não enviado** ao GitHub — a máquina da sessão de 13/11/2026 não tinha credencial (`git push` falhou com "could not read Username"). **Primeira ação da próxima sessão: `git push -u origin feat/sprint1-fundacao-segura` e abrir o PR** (ver "Próxima ação").
-- **Verificação (13/11/2026, local, Node 22.20):** `npm run verify` verde — typecheck nos 3 workspaces, **46 testes** (14 domínio + 32 API) com PGlite em memória, build da API (esbuild) e do web (Vite). Smoke ponta a ponta via curl contra o servidor real (seed → login → empresa → perfil fiscal → cliente importa → duplicado → fila → 403 para cliente → homologação → documento `REVISADA` → 401 sem login → 403 origem estranha): OK.
-- **Não executado:** testes contra PostgreSQL real (não há PostgreSQL nem Docker na máquina; o CI faz isso com `TEST_DATABASE_URL`). CI ainda não rodou porque não houve push.
+- **Branch:** `feat/sprint1-fundacao-segura` (é a branch do PR #7). Push normal, sem force.
+- Base: `main` = `82b7497` (README). PR #1 = `d3bb210`, `1f62c4f`. Sprint 1 original = `9f54287`, `bc61554`, `71cceec`, `b63b94e`.
+- **Estabilização (16/11/2026), em ordem:**
 
-## Concluído
+| Commit | O quê |
+|---|---|
+| `aedf40d` | fix(test): banco PostgreSQL exclusivo por suíte; limpeza garantida no harness |
+| `cf6e413` | fix(db): diretório do PGlite criado recursivamente no primeiro uso |
+| `a82c74e` | fix(deps): drizzle-orm 0.45.4, @fastify/static 10.1.11, vitest 4.1.12 |
+| `a7d781f` | fix(auth): sessões/auditoria atômicas, troca de senha endurecida, CSRF sem Origin |
+| `5c52b51` | fix(review): regra única de classificação, vigência na propagação, concorrência, integridade do XML, sem oráculo de existência |
+| `b16da2d` | ci(docs): gate de `npm audit` de produção, `npm ci`, `drizzle-kit check`; SEGURANCA/README |
+| `7fd26bd` | docs(sprint2a): especificação + ADR-007 |
+| (este) | docs: HANDOFF e CLAUDE.md |
 
-- Monorepo npm workspaces (`packages/domain`, `apps/api`, `apps/web`), TS estrito, vitest com dois projetos, CI com PostgreSQL 16 como serviço.
-- Domínio: parser de NF-e movido intacto; fingerprint de produto; validação de CNPJ; **interfaces** do motor tributário (identificação, classificação, catálogo de regras com vigência, ICMS-ST, antecipação, rateio, custo unitário, memória de cálculo, aprovação/auditoria) + `NotHomologatedClassifier`.
-- API (Fastify 5, Zod 4, Drizzle, PostgreSQL/PGlite): esquema com 11 tabelas e migração `0000_fundacao`; sessões opacas + cookie HttpOnly/Strict; scrypt; rate limit; CSRF por Origin; Helmet; erros seguros; seed idempotente; API opcionalmente serve o build do web (`WEB_DIST_DIR`).
-- Rotas: `auth` (login/logout/me/password), `organizations`, `companies` (+ users, access), `fiscal-profiles` (histórico, vigente em data, nova versão, auditoria), `documents` (importar, histórico, detalhe, XML original), `review-items` (fila, detalhe, transições, reabertura por vigência).
-- Web: login, empresas, empresa (importar/histórico/cadastro fiscal/acessos), documento, fila e detalhe de revisão, administração.
-- Documentação: ADR-001…006, `CLAUDE.md`, `docs/SEGURANCA.md`, README e `docs/ARQUITETURA.md` atualizados.
+## CI (GitHub Actions, PostgreSQL 16 real + PGlite)
 
-## Em andamento / não iniciado
+| SHA | Push | Pull request | Resultado |
+|---|---|---|---|
+| `b63b94e` (antes) | [43461045963](https://github.com/Inovacao-Contar-Brasil/Calculadora_Fiscal/actions/runs/43461045963) | 43483068628 | **falha** (schemas) |
+| `aedf40d` | [43862538374](https://github.com/Inovacao-Contar-Brasil/Calculadora_Fiscal/actions/runs/43862538374) | 43862546367 | verde |
+| `cf6e413` | 43862710179 | 43862718579 | verde |
+| `a82c74e` | 43863511714 | 43863521274 | verde |
+| `5c52b51` | 43864502473 | 43864510368 | verde |
+| `b16da2d` | [43864657021](https://github.com/Inovacao-Contar-Brasil/Calculadora_Fiscal/actions/runs/43864657021) | 43864665712 | verde (com audit + db:check) |
 
-- Nada em andamento com código parcial. Tudo que está na branch compila, passa nos testes e está commitado.
-- Não iniciado (fora do sprint ou dependente de decisão): motor de cálculo, catálogo de regras legais persistido, relatórios PDF/Excel, importação em lote, SSO/Hub, MFA, recuperação de senha, RLS, retenção LGPD.
+Critério "duas execuções consecutivas verdes após a correção" (Issue #5): cumprido — 10 execuções verdes seguidas em 5 SHAs. Os commits só de documentação depois de `b16da2d` têm CI próprio: confira a aba Actions.
+
+Passos do CI: `npm ci` → `npm audit --omit=dev --audit-level=high` → `npm run db:check` → typecheck → testes PGlite → testes PostgreSQL (`TEST_DATABASE_URL`) → build.
+
+## Verificação local (Linux, Node 22.23, npm 10.9, PostgreSQL 16 local)
+
+- `npm run verify`: typecheck nos 3 workspaces, **69 testes** (68 + 1 que só roda no PostgreSQL) em 13 arquivos, build API + web — verde.
+- `TEST_DATABASE_URL=... npm test -- --project api`: **56/56**, 5 execuções seguidas, nenhum banco `cf_test_*` remanescente.
+- Seed em `apps/api/.data` inexistente: cria; segunda execução não duplica.
+- **Não executado nesta sessão:** `npm.cmd run verify` no Windows (fazer na próxima máquina Windows) e teste E2E em navegador.
+
+## O que foi corrigido e por quê
+
+1. **CI PostgreSQL (causa raiz):** no Vitest 3.2/4, `fileParallelism` é opção global e é **ignorada dentro de `projects`**. Os arquivos da API rodavam em paralelo e cada um fazia `DROP SCHEMA public CASCADE` no mesmo banco. Agora `TEST_DATABASE_URL` é só conexão administrativa e cada harness cria/remove um banco exclusivo `cf_test_<pid>_<ts>_<rand>` (nome validado por regex; `DROP DATABASE ... WITH (FORCE)` só nele). Setup com falha libera tudo. `harness.test.ts` cobre corrida, idempotência de migração, limpeza em falha e preservação do banco admin.
+2. **PGlite ENOENT:** PGlite faz mkdir não recursivo; `ensurePgliteDataDir` cria a árvore (no-op se existe; ignora `memory://`/`idb://`).
+3. **Vulnerabilidades:** 11 → produção **0**, dev **4 moderate** (uma causa: esbuild 0.18 dentro do drizzle-kit, só afeta `esbuild serve`, nunca usado — risco aceito). Tabela completa em `docs/SEGURANCA.md`.
+4. **Revisão (Issue #5 item 6):** `EM_ANALISE` não era propagado aos itens já importados (status contraditórios no mesmo produto) e `HOMOLOGADO` ignorava a vigência ao propagar. Agora uma regra única `classificationFor` serve importação e propagação. **Semântica documentada:** `review_items.status` é o fluxo da decisão; `nfe_items.classification_status` é a classificação aplicável **àquela nota na data de emissão** — podem diferir só quando a nota está fora da vigência de uma homologação (fica `PENDENTE_REVISAO`).
+5. **Concorrência:** decisões e reaberturas simultâneas → uma vence, a outra 409 (antes: ambas gravadas, ou 500 no PostgreSQL).
+6. **Autorização:** cliente sem acesso à empresa recebia 403 numa decisão (revelava o item) → 404; inexistente e fora do escopo agora têm resposta idêntica (antes a mensagem diferia).
+7. **Integridade:** download do XML confere o SHA-256 e recusa divergência (409, auditado).
+8. **Sessões:** login/logout/troca de senha atômicos com auditoria; troca de senha revoga todas as sessões e tem rate limit; CSRF recusa `Sec-Fetch-Site: cross-site` sem `Origin`.
+
+## Pendências e riscos
+
+1. **Revisão humana do PR #7** e decisão sobre o PR #1 (fechar apontando para o #7, ou mergear o #1 antes e rebasear).
+2. **Windows:** rodar `npm.cmd ci` e `npm.cmd run verify` e o seed em diretório novo (critério da Issue #5).
+3. **E2E em navegador** do fluxo completo (recomendado pela Issue #5; não feito). Frontend continua sem testes automatizados.
+4. **Decisões de negócio:** retenção LGPD do XML (ADR-005), hospedagem/PostgreSQL gerenciado, e-mail para recuperação de senha, licença Econet, e as 9 decisões listadas na seção 11 da especificação 2A.
+5. Rate limit em memória (uma réplica); sem MFA; sem expiração por inatividade; sem RLS; sem Dependabot.
+6. Homologação com `validFrom` posterior a notas já importadas deixa essas notas `PENDENTE_REVISAO` sem item de revisão aberto que as cubra (lado seguro; a Sprint 2A trata com reprocessamento).
+7. Se um processo de teste for morto, pode sobrar banco `cf_test_*` no PostgreSQL local; remover manualmente.
 
 ## Arquivos e módulos relevantes
 
 | Para… | Veja |
 |---|---|
-| Montagem do servidor, hooks de sessão/CSRF, erros | `apps/api/src/app.ts` |
-| Autorização por empresa/papel | `apps/api/src/auth/authorize.ts` |
-| Sessões e senha | `apps/api/src/auth/session.ts`, `password.ts` |
-| Esquema e migrações | `apps/api/src/db/schema.ts`, `apps/api/drizzle/` |
-| Importação de NF-e (transação completa) | `apps/api/src/modules/documents.ts` → `importNfe` |
-| Vigência do cadastro fiscal | `apps/api/src/modules/fiscal-profiles.ts` |
-| Fila de revisão e memória de classificação | `apps/api/src/modules/review.ts` |
-| Harness de teste e XML sintético | `apps/api/src/test/harness.ts`, `fixtures.ts` |
-| Parser de NF-e | `packages/domain/src/nfe/parser.ts` |
-| Contratos do motor tributário | `packages/domain/src/tributario/index.ts` |
-| Frontend: rotas e páginas | `apps/web/src/App.tsx`, `apps/web/src/pages/*` |
-
-## Decisões arquiteturais
-
-`docs/adr/ADR-001` stack/monorepo/Drizzle/PGlite · `ADR-002` sessões próprias + scrypt + CSRF · `ADR-003` tenancy orgs→empresas, 404 fora do escopo · `ADR-004` vigência append-only (cadastro, decisões, regras) · `ADR-005` XML íntegro em banco, SHA-256, auditoria, retenção pendente · `ADR-006` parser no backend.
-
-## Pendências e riscos
-
-1. **Push + PR** não feitos (credencial). CI nunca rodou nesta branch — pode haver diferença de comportamento no PostgreSQL real (ex.: `select count(*)::int`, índice único parcial, `date` como string). Os testes foram escritos para os dois motores, mas só o PGlite foi executado.
-2. Rate limit em memória (uma réplica). Redis quando escalar.
-3. Decisão de negócio pendente: retenção/exclusão de XML (ADR-005), hospedagem/PostgreSQL gerenciado, serviço de e-mail (recuperação de senha).
-4. Reaproveitamento de classificação entre empresas não existe (decisão por empresa — ADR-004).
-5. O PR #1 segue aberto; este PR o contém. Sugestão: fechar o #1 apontando para o novo PR, ou mergear o #1 primeiro e rebasear.
-6. Frontend sem testes automatizados (só typecheck + build). Fluxo verificado manualmente via API.
+| Servidor, sessão/CSRF, erros | `apps/api/src/app.ts`, `apps/api/src/errors.ts` (`asNotFound`) |
+| Autorização por empresa/papel | `apps/api/src/auth/authorize.ts`, `loadReviewForStaff` em `modules/review.ts` |
+| Regra de classificação do item | `apps/api/src/modules/classification.ts` |
+| Importação de NF-e / XML íntegro | `apps/api/src/modules/documents.ts` |
+| Harness e banco exclusivo de teste | `apps/api/src/test/harness.ts`, `pg-test-database.ts` |
+| PGlite em disco | `apps/api/src/db/client.ts` (`ensurePgliteDataDir`) |
+| Contratos do motor (só interfaces) | `packages/domain/src/tributario/index.ts` |
+| Plano da Sprint 2A | `docs/SPRINT2A_ESPECIFICACAO.md`, `docs/adr/ADR-007-*` |
+| Ameaças, audit de dependências | `docs/SEGURANCA.md` |
 
 ## Próxima ação exata para outro agente
 
-1. `git fetch && git checkout feat/sprint1-fundacao-segura && npm install && npm run verify` — deve estar verde (46 testes).
-2. Se ainda não houver push: `git push -u origin feat/sprint1-fundacao-segura`.
-3. Abrir PR para `main` com título **"feat: Sprint 1 — fundação SaaS segura (auth, cadastro fiscal versionado, importação persistente, isolamento, revisão)"**; corpo: resumo deste HANDOFF + referência `Closes #2` **somente após** revisão humana confirmar os critérios de aceite; linkar ADRs. Rodapé: `🤖 Generated with [Claude Code](https://claude.com/claude-code)`.
-4. Acompanhar o CI (job com PostgreSQL real). Se falhar só no PostgreSQL, corrigir a query e adicionar o caso ao teste.
-5. Depois do PR: (a) decidir com Henrique/Edson retenção LGPD e hospedagem; (b) iniciar Issue #3 (matriz de cenários) **sem** codar fórmulas; (c) opcional de qualidade: testes de componente no web, `npm audit` no CI.
+1. `git fetch origin feat/sprint1-fundacao-segura && git checkout feat/sprint1-fundacao-segura && npm ci && npm run verify` — deve dar verde (69 testes).
+2. Confirmar na aba Actions que o último SHA da branch está verde. Se não estiver, **corrigir antes de qualquer outra coisa**.
+3. Não iniciar código da Sprint 2A até: (a) revisão humana do PR #7; (b) Henrique/Iza/Edson responderem às decisões da seção 11 de `docs/SPRINT2A_ESPECIFICACAO.md`, no mínimo o escopo do piloto (#1) e quem aprova regras (#2).
+4. Liberada a 2A: criar branch nova a partir da `main` já com a Sprint 1 integrada (ou desta branch, se o PR #7 ainda não tiver sido mergeado — combinar com o revisor) e começar pelo incremento **2A.1 Catálogo** (seção 10 da especificação), com testes de isolamento e quatro olhos.
+5. Nunca: fórmula de ICMS-ST/antecipação/DIFAL/rateio, conteúdo Econet sem licença confirmada, dados reais, merge na `main`, push forçado.
