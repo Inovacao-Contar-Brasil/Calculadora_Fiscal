@@ -144,37 +144,33 @@ export async function importNfe(
         const fingerprint = productFingerprint(item);
         let review = byFingerprint.get(fingerprint);
         if (!review) {
-          const open = (
-            await tx
-              .select()
-              .from(reviewItems)
-              .where(and(eq(reviewItems.companyId, company.id), eq(reviewItems.fingerprint, fingerprint), isNull(reviewItems.validTo)))
-              .limit(1)
-          )[0];
-          if (open) {
-            const [updated] = await tx
-              .update(reviewItems)
-              .set({ occurrences: sql`${reviewItems.occurrences} + 1`, lastDocumentId: doc!.id, updatedAt: new Date() })
-              .where(eq(reviewItems.id, open.id))
-              .returning();
-            review = updated!;
-          } else {
-            const [created] = await tx
-              .insert(reviewItems)
-              .values({
-                organizationId: company.organizationId,
-                companyId: company.id,
-                fingerprint,
-                ncm: item.ncm,
-                cest: item.cest,
-                description: item.description,
-                status: "PENDENTE_REVISAO",
-                firstDocumentId: doc!.id,
+          // Duas NF-e distintas podem criar a revisão do mesmo produto em paralelo.
+          // UPSERT pelo índice único parcial evita colisão SELECT -> INSERT e
+          // incrementa occurrences atomicamente por NF-e (não por linha de produto).
+          const [upserted] = await tx
+            .insert(reviewItems)
+            .values({
+              organizationId: company.organizationId,
+              companyId: company.id,
+              fingerprint,
+              ncm: item.ncm,
+              cest: item.cest,
+              description: item.description,
+              status: "PENDENTE_REVISAO",
+              firstDocumentId: doc!.id,
+              lastDocumentId: doc!.id,
+            })
+            .onConflictDoUpdate({
+              target: [reviewItems.companyId, reviewItems.fingerprint],
+              targetWhere: isNull(reviewItems.validTo),
+              set: {
+                occurrences: sql`${reviewItems.occurrences} + 1`,
                 lastDocumentId: doc!.id,
-              })
-              .returning();
-            review = created!;
-          }
+                updatedAt: new Date(),
+              },
+            })
+            .returning();
+          review = upserted!;
           byFingerprint.set(fingerprint, review);
         }
         const status = classificationFor(review, issueDate);
