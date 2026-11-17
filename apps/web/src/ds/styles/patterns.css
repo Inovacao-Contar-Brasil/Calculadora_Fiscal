@@ -1,0 +1,307 @@
+/*
+ * Design System oficial — padrões de página: barra de filtros, voltar, metadados,
+ * texto, linha do tempo, lista de detalhes, formulário, abas e ações de linha.
+ * Ver base.css.
+ */
+
+/* ------------------------------------------- Filtros, detalhe e formulário */
+
+.px-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.px-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface-muted);
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.px-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: var(--color-text-muted) !important;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.px-tab:hover {
+  color: var(--color-text) !important;
+}
+.px-tab[aria-checked='true'] {
+  background: var(--color-surface);
+  color: var(--color-text) !important;
+  box-shadow:
+    var(--shadow-sm),
+    0 0 0 1px var(--color-border);
+}
+.px-tab-count {
+  color: var(--color-text-subtle);
+  font-size: 0.75rem;
+}
+.px-toolbar-selects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.px-select-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  border: 1px solid var(--color-border-control);
+  border-radius: 10px;
+  background: var(--color-surface);
+}
+.px-select-inline span {
+  padding-left: 12px;
+  color: var(--color-text-subtle);
+  font-size: 0.8125rem;
+}
+.px-select-inline .select {
+  width: auto;
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 0;
+  background: transparent;
+  font-weight: 500;
+}
+.px-select-inline .select:focus {
+  box-shadow: none;
+}
+.px-select-inline:focus-within {
+  border-color: var(--color-focus);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-focus) 28%, transparent);
+}
+
+.px-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  min-height: 28px;
+  margin-bottom: -8px;
+  color: var(--color-text-muted) !important;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  text-decoration: none;
+  border-radius: 6px;
+}
+.px-back:hover {
+  color: var(--color-text) !important;
+}
+.px-detail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 18px;
+  margin-top: 10px;
+  color: var(--color-text-subtle);
+  font-size: 0.8125rem;
+}
+.px-prose {
+  max-width: 68ch;
+  margin: 0;
+  color: var(--color-text-muted);
+  line-height: 1.65;
+}
+.px-timeline {
+  margin: 0;
+  padding: 4px var(--px-panel-x) var(--px-panel-y);
+  list-style: none;
+}
+.px-timeline li {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 16px;
+  padding: 10px 0 10px 24px;
+}
+.px-timeline li::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 4px;
+  width: 1px;
+  background: var(--color-border-strong);
+}
+.px-timeline li:first-child::before {
+  top: 18px;
+}
+.px-timeline li:last-child::before {
+  bottom: calc(100% - 18px);
+}
+.px-timeline-dot {
+  position: absolute;
+  top: 15px;
+  left: 0;
+  width: 9px;
+  height: 9px;
+  border: 2px solid var(--color-surface);
+  border-radius: 999px;
+  background: var(--color-text-subtle);
+  box-shadow: 0 0 0 1px var(--color-border-strong);
+}
+.px-timeline li:first-child .px-timeline-dot {
+  background: var(--color-primary);
+}
+.px-timeline p {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+.px-timeline strong {
+  color: var(--color-text);
+  font-weight: 550;
+}
+.px-timeline time {
+  color: var(--color-text-subtle);
+  font-size: 0.8125rem;
+  white-space: nowrap;
+}
+
+.px-dl {
+  margin: 0;
+}
+.px-dl div {
+  display: grid;
+  grid-template-columns: 128px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  min-height: 46px;
+  padding: 0 var(--px-panel-x);
+  border-top: 1px solid var(--color-border);
+}
+.px-dl dt {
+  color: var(--color-text-subtle);
+  font-size: 0.8125rem;
+}
+.px-dl dd {
+  margin: 0;
+}
+.px-aside-note {
+  display: flex;
+  gap: 8px;
+  margin: 0;
+  padding: 12px var(--px-panel-x) 16px;
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-subtle);
+  font-size: 0.8125rem;
+}
+.px-aside-note svg {
+  flex: none;
+  margin-top: 3px;
+}
+
+.px-form {
+  display: grid;
+  gap: 18px;
+  padding: var(--px-panel-x);
+}
+.px-form-row {
+  display: grid;
+  gap: 18px;
+}
+@container px-main (min-width: 600px) {
+  .px-form-row {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.px-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: 6px calc(var(--px-panel-x) * -1) calc(var(--px-panel-x) * -1);
+  padding: 14px var(--px-panel-x);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface-muted);
+  border-radius: 0 0 calc(var(--px-panel-radius) - 1px) calc(var(--px-panel-radius) - 1px);
+}
+
+/* ------------------------------------------------- Abas e apoio de tabela */
+/*
+ * Abas (Tabs) na aparência oficial. O seletor parte da raiz do Design System:
+ * toda aba dentro de .px-root tem este visual, sem classe de apoio. A
+ * especificidade (0,2,0) é a mesma da regra original, então o resultado na
+ * prévia aprovada não muda.
+ */
+
+.px-root .tab-list {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+.px-root .tab {
+  position: relative;
+  min-height: 40px;
+  padding: 0 4px;
+  margin-right: 16px;
+  border: 0;
+  background: none;
+  color: var(--color-text-muted);
+  font-weight: 500;
+  cursor: pointer;
+}
+.px-root .tab[aria-selected='true'] {
+  color: var(--color-text);
+}
+.px-root .tab[aria-selected='true']::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--color-primary);
+}
+.px-root .tab-panel {
+  outline: none;
+}
+.px-root .tab-panel:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 4px;
+  border-radius: 12px;
+}
+.px-panel-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 14px var(--px-panel-x);
+  color: var(--color-text-subtle);
+  font-size: 0.8125rem;
+}
+
+.px-you {
+  padding: 0 6px;
+  border-radius: 5px;
+  background: var(--color-neutral-bg);
+  color: var(--color-text-muted);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  line-height: 18px;
+}
+
+.px-cell-actions {
+  text-align: right;
+  white-space: nowrap;
+}
+.hub-premium .px-btn-sm {
+  min-height: 30px;
+  padding: 0 12px;
+  font-size: 0.8125rem;
+}

@@ -1,0 +1,271 @@
+/*
+ * Camada "Premium" do tema (proposta v2, em avaliação — docs/16).
+ * Opt-in: só vale dentro de `.hub-theme.hub-premium`. Hoje é usada apenas pelo
+ * protótipo em /design-system/premium/; as telas funcionais NÃO a carregam.
+ *
+ * Mesma arquitetura de theme.css: primitivos (--hub-graphite-*) → semânticos
+ * com os MESMOS nomes (--color-*) → componentes de src/ui restilizados.
+ * A marca continua vindo de --brand-primary-* (white-label intacto).
+ * Novos semânticos: --color-surface-raised, --color-text-subtle,
+ * --color-border-strong, --color-chrome (fundo da barra lateral/cabeçalho).
+ */
+:root {
+  /* Grafite com nuance azul-marinho (claro → escuro) */
+  --hub-graphite-0: #ffffff;
+  --hub-graphite-25: #f8f8fb;
+  --hub-graphite-50: #f2f3f7;
+  --hub-graphite-75: #eef0f4;
+  --hub-graphite-100: #e5e6ee;
+  --hub-graphite-150: #d5d8e2;
+  --hub-graphite-300: #a3a7bf;
+  --hub-graphite-350: #8b90aa;
+  --hub-graphite-400: #7f8399;
+  --hub-graphite-450: #6b7092;
+  --hub-graphite-500: #62667e;
+  --hub-graphite-600: #565a70;
+  --hub-graphite-750: #2f3346;
+  --hub-graphite-780: #252839;
+  --hub-graphite-800: #1d1f2f;
+  --hub-graphite-850: #161825;
+  --hub-graphite-880: #12131e;
+  --hub-graphite-900: #0e0f17;
+  --hub-graphite-ink-light: #ecedf4;
+  --hub-graphite-ink-dark: #161a2b;
+
+  --hub-font-ui: 'Inter Variable', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;
+}
+
+/* ---------- Claro ---------- */
+.hub-theme.hub-premium[data-theme='light'] {
+  --color-bg: var(--hub-graphite-25);
+  --color-chrome: var(--hub-graphite-25);
+  --color-surface: var(--hub-graphite-0);
+  --color-surface-raised: var(--hub-graphite-0);
+  --color-surface-muted: var(--hub-graphite-50);
+  --color-border: var(--hub-graphite-100);
+  --color-border-strong: var(--hub-graphite-150);
+  --color-border-control: var(--hub-graphite-400);
+  --color-text: var(--hub-graphite-ink-dark);
+  --color-text-muted: var(--hub-graphite-600);
+  --color-text-subtle: var(--hub-graphite-500);
+  --color-neutral-bg: var(--hub-graphite-75);
+  --color-hover: rgb(22 26 43 / 4.5%);
+  --color-backdrop: rgb(14 15 23 / 36%);
+  --color-brand-plate: transparent;
+
+  --color-primary: var(--brand-primary-600);
+  --color-primary-hover: var(--brand-primary-700);
+  --color-primary-contrast: #ffffff;
+  --color-focus: var(--brand-primary-600);
+  --color-selected-bg: var(--hub-graphite-0);
+  --color-selected-text: var(--hub-graphite-ink-dark);
+
+  --color-danger: var(--hub-red-600);
+  --color-danger-bg: #fdeeec;
+  --color-warning: var(--hub-amber-700);
+  --color-warning-bg: #fdf3e1;
+  --color-success: var(--hub-green-700);
+  --color-success-bg: #e8f5ec;
+  --color-info: var(--hub-blue-700);
+  --color-info-bg: #eaf1fb;
+
+  --shadow-sm: 0 1px 2px rgb(22 26 43 / 4%), 0 2px 8px -2px rgb(22 26 43 / 6%);
+  --shadow-card: 0 1px 2px rgb(22 26 43 / 3%), 0 6px 24px -12px rgb(22 26 43 / 12%);
+  --shadow-lg: 0 18px 48px -12px rgb(22 26 43 / 22%), 0 2px 6px rgb(22 26 43 / 6%);
+}
+
+/* ---------- Escuro ---------- */
+.hub-theme.hub-premium[data-theme='dark'] {
+  --color-bg: var(--hub-graphite-900);
+  --color-chrome: var(--hub-graphite-900);
+  --color-surface: var(--hub-graphite-850);
+  --color-surface-raised: var(--hub-graphite-800);
+  --color-surface-muted: var(--hub-graphite-880);
+  --color-border: var(--hub-graphite-780);
+  --color-border-strong: var(--hub-graphite-750);
+  --color-border-control: var(--hub-graphite-450);
+  --color-text: var(--hub-graphite-ink-light);
+  --color-text-muted: var(--hub-graphite-300);
+  --color-text-subtle: var(--hub-graphite-350);
+  --color-neutral-bg: var(--hub-graphite-780);
+  --color-hover: rgb(236 237 244 / 5%);
+  --color-backdrop: rgb(4 5 10 / 64%);
+  /* A escrita azul-marinho do logotipo nunca fica direto sobre fundo escuro. */
+  --color-brand-plate: #e8eaf2;
+
+  --color-primary: var(--brand-primary-400);
+  --color-primary-hover: var(--brand-primary-300);
+  --color-primary-contrast: var(--brand-primary-950);
+  --color-focus: var(--brand-primary-300);
+  --color-selected-bg: var(--hub-graphite-800);
+  --color-selected-text: var(--hub-graphite-ink-light);
+
+  --color-danger: var(--hub-red-300);
+  --color-danger-bg: #2a1518;
+  --color-warning: var(--hub-amber-300);
+  --color-warning-bg: #2a2214;
+  --color-success: var(--hub-green-300);
+  --color-success-bg: #132519;
+  --color-info: var(--hub-blue-300);
+  --color-info-bg: #14223a;
+
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 30%);
+  --shadow-card: 0 1px 0 rgb(255 255 255 / 2.5%) inset, 0 8px 24px -16px rgb(0 0 0 / 60%);
+  --shadow-lg: 0 24px 56px -12px rgb(0 0 0 / 70%), 0 0 0 1px rgb(255 255 255 / 4%);
+}
+
+/* ---------- Base ---------- */
+.hub-theme.hub-premium {
+  --font-sans: var(--hub-font-ui);
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  font-feature-settings: 'cv11', 'ss01';
+  letter-spacing: -0.006em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+.hub-premium h1,
+.hub-premium h2,
+.hub-premium h3 {
+  font-weight: 550;
+  letter-spacing: -0.018em;
+}
+.hub-premium .num {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum', 'cv11';
+}
+.hub-premium :focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+/* ---------- Componentes de src/ui restilizados ---------- */
+.hub-premium .btn {
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  transition:
+    background-color 120ms var(--ease),
+    border-color 120ms var(--ease),
+    color 120ms var(--ease),
+    box-shadow 120ms var(--ease);
+}
+.hub-premium .btn svg {
+  flex: none;
+}
+.hub-premium .btn-primary {
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 12%) inset,
+    0 1px 2px rgb(0 0 0 / 16%);
+}
+.hub-premium .btn-secondary {
+  background: var(--color-surface);
+  border-color: var(--color-border-strong);
+  color: var(--color-text);
+}
+.hub-premium .btn-secondary:hover:not(:disabled) {
+  background: var(--color-surface-muted);
+}
+.hub-premium .btn-ghost {
+  color: var(--color-text-muted);
+}
+.hub-premium .btn-ghost:hover:not(:disabled) {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+.hub-premium .btn-danger {
+  background: transparent;
+  border-color: color-mix(in srgb, var(--color-danger) 55%, transparent);
+}
+.hub-premium .btn-danger:hover:not(:disabled) {
+  background: var(--color-danger-bg);
+}
+
+.hub-premium .card {
+  border-radius: var(--radius-lg);
+  border-color: var(--color-border);
+  box-shadow: var(--shadow-card);
+  padding: 20px;
+}
+
+.hub-premium .field {
+  gap: 6px;
+}
+.hub-premium .field label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-text);
+}
+.hub-premium .field .hint {
+  font-size: 0.8125rem;
+  color: var(--color-text-subtle);
+}
+.hub-premium .input,
+.hub-premium .select,
+.hub-premium .textarea {
+  min-height: 38px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border-color: var(--color-border-control);
+  background: var(--color-surface);
+  font-size: 0.9375rem;
+  transition:
+    border-color 120ms var(--ease),
+    box-shadow 120ms var(--ease);
+}
+.hub-premium .input:hover,
+.hub-premium .select:hover,
+.hub-premium .textarea:hover {
+  border-color: var(--color-text-subtle);
+}
+/* :focus (e não :focus-visible) — campos sempre mostram onde está o cursor,
+   inclusive o seletor de data, cujo foco interno só casa :focus-within. */
+.hub-premium .input:focus,
+.hub-premium .input:focus-within,
+.hub-premium .select:focus,
+.hub-premium .textarea:focus {
+  outline: none;
+  border-color: var(--color-focus);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-focus) 28%, transparent);
+}
+.hub-premium .input[aria-invalid='true'],
+.hub-premium .textarea[aria-invalid='true'] {
+  border-color: var(--color-danger);
+}
+
+/* Badges discretos: cor no texto, fundo tonal. Contraste AA verificado. */
+.hub-premium .badge {
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 18px;
+}
+.hub-premium .alert {
+  border-radius: 10px;
+  font-size: 0.875rem;
+}
+.hub-premium .spinner {
+  width: 22px;
+  height: 22px;
+  border-width: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hub-premium *,
+  .hub-premium *::before,
+  .hub-premium *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}

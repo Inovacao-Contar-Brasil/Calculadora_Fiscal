@@ -1,0 +1,59 @@
+/* Design System oficial — microinterações, movimento reduzido e alto contraste. Ver base.css. */
+
+/* Feedback de clique: leve compressão, sem deslocar o layout. */
+.hub-premium .btn,
+.px-chip,
+.px-icon-btn,
+.px-tab,
+.px-org-switch,
+.px-account,
+.px-search,
+.px-bottom-item {
+  transition-property: background-color, border-color, color, box-shadow, transform;
+  transition-duration: 120ms;
+  transition-timing-function: var(--ease);
+}
+.hub-premium .btn:active:not(:disabled),
+.px-chip:active,
+.px-icon-btn:active,
+.px-tab:active,
+.px-org-switch:active,
+.px-account:active,
+.px-bottom-item:active {
+  transform: scale(0.98);
+}
+/* Linhas clicáveis: fundo no hover, contorno interno no foco por teclado. */
+.px-nav-item:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+}
+.px-nav-item > svg {
+  transition: color 120ms var(--ease);
+}
+.px-panel {
+  transition: border-color 160ms var(--ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .px-page,
+  .px-menu,
+  .px-palette[open],
+  .px-sheet[open],
+  .px-toast,
+  .px-skel {
+    animation: none;
+  }
+  .px-collapse {
+    transition: none;
+  }
+}
+@media (forced-colors: active) {
+  .px-status-dot {
+    forced-color-adjust: none;
+    background: CanvasText;
+  }
+  .px-nav-item[aria-current='page'],
+  .px-tab[aria-checked='true'] {
+    outline: 2px solid Highlight;
+  }
+}

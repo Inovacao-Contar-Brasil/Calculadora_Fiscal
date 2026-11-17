@@ -1,0 +1,383 @@
+/* Design System oficial — página, ações rápidas, seção de módulo, grade, painel e linhas. Ver base.css. */
+
+/* -------------------------------------------------------- Conteúdo */
+.px-main {
+  container: px-main / inline-size;
+  width: 100%;
+  max-width: calc(var(--px-content-max) + 2 * var(--px-gutter));
+  margin: 0 auto;
+  padding: 28px var(--px-gutter) 64px;
+  outline: none;
+}
+.px-page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px;
+  animation: px-enter 220ms var(--ease);
+}
+@keyframes px-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+.px-page-narrow {
+  max-width: 1040px;
+}
+.px-page-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px 24px;
+}
+.px-page-titles {
+  min-width: 0;
+}
+.px-page-head h1 {
+  max-width: 760px;
+  overflow-wrap: anywhere;
+  font-size: 1.625rem;
+  font-weight: 550;
+  letter-spacing: -0.024em;
+  line-height: 1.2;
+}
+.px-eyebrow {
+  margin: 0 0 6px;
+  color: var(--color-text-subtle);
+  font-size: 0.8125rem;
+  font-weight: 450;
+}
+.px-page-sub {
+  margin: 6px 0 0;
+  color: var(--color-text-muted);
+}
+
+.px-quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: -4px;
+}
+.px-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 14px 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-text) !important;
+  font-weight: 480;
+  text-decoration: none;
+  white-space: nowrap;
+  box-shadow: var(--shadow-sm);
+  transition:
+    background-color 120ms var(--ease),
+    border-color 120ms var(--ease);
+}
+.px-chip > svg {
+  color: var(--color-text-subtle);
+}
+.px-chip:hover {
+  border-color: var(--color-border-strong);
+  background: var(--color-surface-muted);
+}
+.px-chip-primary {
+  border-color: transparent;
+  background: var(--color-primary);
+  color: var(--color-primary-contrast) !important;
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 12%) inset,
+    0 1px 2px rgb(0 0 0 / 16%);
+}
+.px-chip-primary > svg {
+  color: inherit;
+}
+.px-chip-primary:hover {
+  border-color: transparent;
+  background: var(--color-primary-hover);
+}
+.px-chip-count {
+  min-width: 20px;
+  margin-right: -4px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--color-neutral-bg);
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 550;
+  line-height: 20px;
+  text-align: center;
+}
+
+/* ------------------------------------------------- Seção de módulo */
+.px-home-module {
+  display: grid;
+  gap: 14px;
+  margin-top: 8px;
+}
+.px-home-module-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+.px-home-module-head h2 {
+  font-size: 1rem;
+  font-weight: 550;
+  letter-spacing: -0.012em;
+}
+.px-home-module-icon {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+}
+.px-home-module-summary {
+  color: var(--color-text-subtle);
+  font-size: 0.8125rem;
+}
+.px-home-module-summary::before {
+  content: '·';
+  margin-right: 10px;
+}
+.px-text-danger {
+  color: var(--color-danger);
+}
+.px-home-module-link {
+  gap: 2px;
+  margin-left: auto;
+}
+
+/* ----------------------------------------------- Esqueleto (carregando) */
+.px-skeleton {
+  display: grid;
+  gap: 16px;
+}
+.px-skel {
+  border-radius: 8px;
+  background: linear-gradient(
+    90deg,
+    var(--color-surface-muted) 0%,
+    var(--color-neutral-bg) 50%,
+    var(--color-surface-muted) 100%
+  );
+  background-size: 200% 100%;
+  animation: px-shimmer 1.1s linear infinite;
+}
+.px-skeleton-panel {
+  gap: 14px;
+  min-height: 220px;
+}
+@keyframes px-shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/* ------------------------------------------------------------ Grade */
+/*
+ * Grade única de 12 colunas para todas as páginas. Só existem três larguras —
+ * principal, lateral e total (data-span) —, então a emenda entre as colunas
+ * cai sempre na mesma linha-guia, em qualquer linha de cartões.
+ */
+.px-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: var(--px-gap);
+}
+.px-grid > * {
+  grid-column: 1 / -1;
+}
+@container px-main (min-width: 880px) {
+  .px-grid > [data-span='main'] {
+    grid-column: span var(--px-span-main);
+  }
+  .px-grid > [data-span='side'] {
+    grid-column: span var(--px-span-side);
+  }
+}
+/* Painéis empilhados dentro de uma mesma coluna da grade. */
+.px-stack {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: var(--px-gap);
+}
+
+/* ----------------------------------------------------------- Painel */
+.px-panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: var(--px-panel-y) var(--px-panel-x);
+  border: 1px solid var(--color-border);
+  border-radius: var(--px-panel-radius);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+/* Conteúdo de borda a borda; o recorte preserva os cantos ao destacar linhas. */
+.px-panel-flush {
+  padding: 0;
+  overflow: clip;
+}
+/* Cartão que não acompanha a altura do vizinho (detalhes, ajuda). */
+.px-panel-top {
+  align-self: start;
+}
+.px-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px var(--px-panel-x) 12px;
+}
+.px-panel-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  padding: 0 var(--px-panel-x) var(--px-panel-y);
+}
+.px-panel-titles {
+  min-width: 0;
+}
+/* Título, link e alternância ocupam a mesma faixa de 28px: alinham entre cartões. */
+.px-panel-titles :is(h2, h3) {
+  display: flex;
+  align-items: center;
+  min-height: 28px;
+  font-size: 0.9375rem;
+  font-weight: 550;
+  letter-spacing: -0.01em;
+}
+.px-panel-titles p {
+  margin: 0;
+  color: var(--color-text-subtle);
+  font-size: 0.8125rem;
+}
+.px-panel-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+}
+.px-link-subtle {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 4px;
+  color: var(--color-primary) !important;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  text-decoration: none;
+  border-radius: 6px;
+}
+.px-link-subtle:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.px-link-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: var(--color-primary) !important;
+  font-weight: 500;
+  cursor: pointer;
+}
+.px-link-button:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* ------------------------------------------------- Linhas clicáveis */
+/*
+ * Uma geometria para todas as listas de cartão (prazos, situações, pendências,
+ * atividade, carga): divisórias de borda a borda e conteúdo na margem do
+ * cartão — a mesma das tabelas.
+ */
+.px-rows {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--color-border);
+  list-style: none;
+}
+.px-rows > li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+.px-rows > li + li {
+  border-top: 1px solid var(--color-border);
+}
+/* Listas com quantidade fixa de linhas ocupam a altura do cartão vizinho. */
+.px-rows-fill {
+  flex: 1;
+  grid-auto-rows: minmax(min-content, 1fr);
+}
+.px-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 46px;
+  padding: 10px var(--px-panel-x);
+  text-decoration: none;
+  transition: background-color 120ms var(--ease);
+}
+.px-row:hover {
+  background: var(--color-hover);
+}
+.px-row:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+}
+
+/* Alternância de visualização (rádios nativos) */
+.px-toggle {
+  display: inline-flex;
+  gap: 2px;
+  margin: 0;
+  padding: 1px;
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  background: var(--color-surface-muted);
+}
+.px-toggle label {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 24px;
+  border-radius: 7px;
+  color: var(--color-text-subtle);
+  cursor: pointer;
+}
+.px-toggle input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.px-toggle label:has(input:checked) {
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow:
+    var(--shadow-sm),
+    0 0 0 1px var(--color-border);
+}
+.px-toggle label:has(input:focus-visible) {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
+}

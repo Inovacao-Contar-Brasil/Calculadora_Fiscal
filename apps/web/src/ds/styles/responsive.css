@@ -1,0 +1,265 @@
+/* Design System oficial — adaptações por largura (tablet e celular). Ver base.css. */
+
+@media (max-width: 1180px) {
+  .px-header-context {
+    display: none;
+  }
+  .px-search {
+    margin-left: 0;
+  }
+}
+
+/* ====================================================== Celular/tablet */
+
+@media (max-width: 899px) {
+  .px-root {
+    --px-gap: 12px;
+    --px-panel-x: 16px;
+    --px-panel-y: 16px;
+    --px-panel-radius: 14px;
+  }
+  .px-app {
+    display: block;
+  }
+  .px-column {
+    border-left: 0;
+  }
+  .px-sidebar {
+    display: none;
+  }
+  .px-header {
+    height: 56px;
+  }
+  .px-header-inner {
+    gap: 6px;
+    padding: 0 8px 0 14px;
+  }
+  .px-header-context {
+    display: none;
+  }
+  .px-header-actions {
+    margin-left: auto;
+    padding-left: 0;
+    border-left: 0;
+  }
+  .px-header-mobile-brand {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+  }
+  .px-header-symbol {
+    width: auto;
+    height: 26px;
+  }
+  .px-header-mobile-brand .px-org-avatar {
+    width: 26px;
+    height: 26px;
+  }
+  .px-org-switch-compact .px-org-switch-text strong {
+    max-width: 44vw;
+    font-size: 0.9375rem;
+  }
+  .px-search {
+    display: none;
+  }
+  .px-only-desktop {
+    display: none !important;
+  }
+  .px-only-mobile {
+    display: inline-grid;
+  }
+  .sr-only.px-only-mobile {
+    display: block;
+  }
+  .px-main {
+    padding: 20px 16px calc(96px + env(safe-area-inset-bottom));
+  }
+  .px-page {
+    gap: 16px;
+  }
+  .px-page-head h1 {
+    font-size: 1.375rem;
+  }
+  .px-quick {
+    flex-wrap: nowrap;
+    margin: -4px -16px 0;
+    padding: 2px 16px 4px;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+  }
+  .px-quick::-webkit-scrollbar {
+    display: none;
+  }
+  .px-chip {
+    scroll-snap-align: start;
+    min-height: 40px;
+  }
+
+  /* Tabelas viram linhas compactas */
+  .px-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .px-table,
+  .px-table tbody {
+    display: block;
+  }
+  .px-table tbody tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 12px;
+    padding: 12px var(--px-panel-x);
+    border-top: 1px solid var(--color-border);
+  }
+  .px-table tbody tr:first-child {
+    border-top: 0;
+  }
+  .px-table td {
+    padding: 0 !important;
+    border: 0;
+  }
+  .px-table td.px-cell-title {
+    flex: 0 0 100%;
+    width: auto;
+    max-width: 100%;
+    min-width: 0;
+  }
+  .px-cell-sub {
+    display: none;
+  }
+  .px-home-module-summary {
+    flex-basis: 100%;
+    order: 3;
+    padding-left: 36px;
+  }
+  .px-home-module-summary::before {
+    content: none;
+  }
+
+  .px-person-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .px-toolbar {
+    gap: 10px;
+  }
+  .px-tabs {
+    margin: 0 -16px;
+    padding: 3px;
+    width: calc(100% + 32px);
+    border-radius: 0;
+    border-inline: 0;
+  }
+  .px-toolbar-selects {
+    width: 100%;
+  }
+  .px-select-inline {
+    /* Em telas muito estreitas os filtros empilham em vez de cortar o valor. */
+    flex: 1 1 160px;
+    min-width: 0;
+  }
+  .px-select-inline .select {
+    flex: 1;
+    min-width: 0;
+    width: 100%;
+    min-height: 40px;
+  }
+  .px-page-head > .px-menu-root {
+    width: 100%;
+  }
+  .px-page-head > .px-menu-root > .btn {
+    width: 100%;
+  }
+  .px-form-actions .btn {
+    flex: 1;
+    min-height: 44px;
+  }
+
+  .px-bottom-nav {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 30;
+    display: grid;
+    grid-auto-columns: 1fr;
+    grid-auto-flow: column;
+    padding: 6px 6px calc(6px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--color-border);
+    background: color-mix(in srgb, var(--color-chrome) 92%, transparent);
+    backdrop-filter: saturate(140%) blur(16px);
+  }
+  .px-bottom-item {
+    display: grid;
+    justify-items: center;
+    gap: 2px;
+    min-height: 52px;
+    padding: 6px 2px 4px;
+    border: 0;
+    border-radius: 12px;
+    background: none;
+    color: var(--color-text-subtle) !important;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .px-bottom-item[aria-current='page'] {
+    color: var(--color-text) !important;
+  }
+  .px-bottom-item[aria-current='page'] .px-bottom-icon {
+    color: var(--color-primary);
+  }
+  .px-bottom-icon {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 26px;
+    border-radius: 999px;
+  }
+  .px-bottom-item[aria-current='page'] .px-bottom-icon {
+    background: color-mix(in srgb, var(--color-primary) 14%, transparent);
+  }
+  .px-bottom-badge {
+    position: absolute;
+    top: -3px;
+    right: 2px;
+    min-width: 18px;
+    padding: 0 5px;
+    border: 2px solid var(--color-chrome);
+    border-radius: 999px;
+    background: var(--color-text);
+    color: var(--color-bg);
+    font-size: 0.625rem;
+    font-weight: 650;
+    line-height: 14px;
+  }
+  .px-toast-region {
+    bottom: calc(84px + env(safe-area-inset-bottom));
+    width: calc(100% - 32px);
+  }
+  .px-toast {
+    white-space: normal;
+  }
+  .px-palette {
+    width: calc(100% - 16px);
+    max-height: calc(100dvh - 24px);
+    margin-top: 8px;
+  }
+  .px-palette-scope {
+    display: none;
+  }
+
+  .px-only-mobile-inline {
+    display: inline;
+  }
+}

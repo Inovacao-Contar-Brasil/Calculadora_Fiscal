@@ -1,0 +1,153 @@
+/*
+ * Tema white-label do Hub (ADR-003, proposta). Três camadas:
+ *  1. Primitivos (--hub-*): valores brutos, nunca usados pelos componentes.
+ *     Neutros frios puxados para o azul-marinho institucional (identidade
+ *     padrão Contar Brasil); status reproduzem os valores de styles/global.css.
+ *  2. Marca (--brand-primary-50…950): dado da organização, aplicado inline
+ *     pelo <ThemeRoot> a partir de dados validados por @hub/contracts.
+ *  3. Semânticos (--color-*): os MESMOS nomes que styles/global.css já usa,
+ *     redefinidos por modo dentro de .hub-theme[data-theme]. Assim os
+ *     componentes de src/ui funcionam sem alteração.
+ * Propriedades customizadas são resolvidas onde são declaradas: todo token que
+ * depende de outro é redeclarado aqui. Status nunca vem da marca.
+ */
+:root {
+  /* Neutros (claro → escuro), frios, levemente azul-marinho */
+  --hub-slate-0: #ffffff;
+  --hub-slate-25: #f6f7fa;
+  --hub-slate-50: #eff1f5;
+  --hub-slate-75: #eceef3;
+  --hub-slate-100: #dde1ea;
+  --hub-slate-300: #a3a9bd;
+  --hub-slate-400: #7c8398;
+  --hub-slate-500: #646b80;
+  --hub-slate-600: #555c70;
+  --hub-slate-700: #2b3040;
+  --hub-slate-750: #242838;
+  --hub-slate-800: #1c2030;
+  --hub-slate-850: #161927;
+  --hub-slate-900: #0f111b;
+  --hub-ink-light: #e7e9f0;
+  --hub-ink-dark: #161a2b;
+
+  /* Status (independentes de marca) */
+  --hub-red-600: #b42318;
+  --hub-red-50: #fdecea;
+  --hub-red-300: #ff8a7a;
+  --hub-red-950: #3a1a17;
+  --hub-amber-700: #8a5300;
+  --hub-amber-50: #fff4de;
+  --hub-amber-300: #ffc266;
+  --hub-amber-950: #352a14;
+  --hub-green-700: #1d6b3a;
+  --hub-green-50: #e5f5eb;
+  --hub-green-300: #7fd39d;
+  --hub-green-950: #15301f;
+  --hub-blue-700: #1f5fa8;
+  --hub-blue-50: #e7f0fb;
+  --hub-blue-300: #8fb9ef;
+  --hub-blue-950: #172a40;
+}
+
+.hub-theme {
+  min-height: 100vh;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+}
+
+/* ---------- Claro ---------- */
+.hub-theme[data-theme='light'] {
+  color-scheme: light;
+  --color-bg: var(--hub-slate-25);
+  --color-surface: var(--hub-slate-0);
+  --color-surface-muted: var(--hub-slate-50);
+  --color-border: var(--hub-slate-100);
+  --color-border-control: var(--hub-slate-400);
+  --color-text: var(--hub-ink-dark);
+  --color-text-muted: var(--hub-slate-600);
+  --color-neutral-bg: var(--hub-slate-75);
+  --color-backdrop: rgb(15 17 27 / 50%);
+  /* Superfície onde o logotipo oficial é apresentado. */
+  --color-brand-plate: transparent;
+
+  --color-primary: var(--brand-primary-600);
+  --color-primary-hover: var(--brand-primary-700);
+  --color-primary-contrast: #ffffff;
+  --color-focus: var(--brand-primary-600);
+  --color-selected-bg: var(--brand-primary-50);
+  --color-selected-text: var(--brand-primary-800);
+
+  --color-danger: var(--hub-red-600);
+  --color-danger-bg: var(--hub-red-50);
+  --color-warning: var(--hub-amber-700);
+  --color-warning-bg: var(--hub-amber-50);
+  --color-success: var(--hub-green-700);
+  --color-success-bg: var(--hub-green-50);
+  --color-info: var(--hub-blue-700);
+  --color-info-bg: var(--hub-blue-50);
+
+  --shadow-sm: 0 1px 2px rgb(16 24 40 / 6%), 0 1px 3px rgb(16 24 40 / 8%);
+  --shadow-lg: 0 24px 48px -12px rgb(16 24 40 / 28%);
+}
+
+/* ---------- Escuro ---------- */
+.hub-theme[data-theme='dark'] {
+  color-scheme: dark;
+  --color-bg: var(--hub-slate-900);
+  --color-surface: var(--hub-slate-850);
+  --color-surface-muted: var(--hub-slate-800);
+  --color-border: var(--hub-slate-700);
+  --color-border-control: var(--hub-slate-500);
+  --color-text: var(--hub-ink-light);
+  --color-text-muted: var(--hub-slate-300);
+  --color-neutral-bg: var(--hub-slate-750);
+  --color-backdrop: rgb(0 0 0 / 62%);
+  /* A escrita azul-marinho do logotipo nunca fica direto sobre fundo escuro. */
+  --color-brand-plate: var(--hub-slate-0);
+
+  /* Ação clara com texto profundo: evita blocos saturados brilhantes. */
+  --color-primary: var(--brand-primary-400);
+  --color-primary-hover: var(--brand-primary-300);
+  --color-primary-contrast: var(--brand-primary-950);
+  --color-focus: var(--brand-primary-300);
+  --color-selected-bg: var(--brand-primary-900);
+  --color-selected-text: var(--brand-primary-200);
+
+  --color-danger: var(--hub-red-300);
+  --color-danger-bg: var(--hub-red-950);
+  --color-warning: var(--hub-amber-300);
+  --color-warning-bg: var(--hub-amber-950);
+  --color-success: var(--hub-green-300);
+  --color-success-bg: var(--hub-green-950);
+  --color-info: var(--hub-blue-300);
+  --color-info-bg: var(--hub-blue-950);
+
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 40%), 0 1px 3px rgb(0 0 0 / 30%);
+  --shadow-lg: 0 24px 48px -12px rgb(0 0 0 / 70%);
+}
+
+/*
+ * Correção de acessibilidade aplicada só dentro do tema: a borda atual dos
+ * campos (--color-border) tem 1,34:1 sobre a superfície; limites de controles
+ * exigem 3:1 (WCAG 1.4.11). styles/global.css não é alterado.
+ */
+.hub-theme .input,
+.hub-theme .select,
+.hub-theme .textarea {
+  border-color: var(--color-border-control);
+}
+.hub-theme .input[aria-invalid='true'],
+.hub-theme .textarea[aria-invalid='true'] {
+  border-color: var(--color-danger);
+}
+
+/*
+ * Item ativo do menu: global.css usa a primária sobre 14% da própria primária,
+ * o que reprova (4,40:1) com marcas de primária mais clara, como a cobre.
+ * No tema, usa o par selecionado, validado para toda marca e modo.
+ */
+.hub-theme .nav a[aria-current='page'] {
+  background: var(--color-selected-bg);
+  color: var(--color-selected-text);
+}

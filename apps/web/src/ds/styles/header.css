@@ -1,0 +1,116 @@
+/* Design System oficial — cabeçalho do AppShell. Ver base.css. */
+
+/* --------------------------------------------------------- Cabeçalho */
+.px-header {
+  position: sticky;
+  top: var(--px-bar);
+  z-index: 20;
+  height: 60px;
+  border-bottom: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--color-bg) 86%, transparent);
+  backdrop-filter: saturate(140%) blur(14px);
+}
+.px-header-inner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: 100%;
+  max-width: calc(var(--px-content-max) + 2 * var(--px-gutter));
+  margin: 0 auto;
+  padding: 0 var(--px-gutter);
+}
+.px-header-context {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 1 auto;
+  min-width: 0;
+  color: var(--color-text-subtle);
+  font-size: 0.8125rem;
+  white-space: nowrap;
+}
+.px-header-context svg {
+  flex: none;
+  opacity: 0.7;
+}
+.px-header-org {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.px-header-crumb {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  border-radius: 6px;
+  text-decoration: none;
+}
+.px-header-crumb:hover {
+  color: var(--color-text);
+}
+.px-header-section {
+  color: var(--color-text);
+  font-weight: 500;
+}
+.px-header-mobile-brand {
+  display: none;
+}
+.px-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 1 520px;
+  min-width: 220px;
+  margin-left: auto;
+  height: 38px;
+  padding: 0 8px 0 12px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 10px;
+  background: var(--color-surface);
+  color: var(--color-text-subtle) !important;
+  cursor: text;
+  transition: border-color 120ms var(--ease);
+}
+.px-search:hover {
+  border-color: var(--color-border-control);
+}
+.px-search-label {
+  flex: 1;
+  text-align: left;
+}
+.px-kbd {
+  padding: 1px 6px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 6px;
+  background: var(--color-surface-muted);
+  color: var(--color-text-subtle);
+  font-family: inherit;
+  font-size: 0.6875rem;
+  font-weight: 550;
+  line-height: 18px;
+}
+.px-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 10px;
+  border-left: 1px solid var(--color-border);
+}
+.px-icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: none;
+  color: var(--color-text-muted) !important;
+  cursor: pointer;
+}
+.px-icon-btn:hover {
+  background: var(--color-hover);
+  color: var(--color-text) !important;
+}
+.px-only-mobile,
+.px-only-mobile-inline {
+  display: none;
+}

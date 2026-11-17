@@ -1,0 +1,89 @@
+/* Design System oficial — menu suspenso. Ver base.css. */
+
+/* ----------------------------------------------------------- Menu */
+.px-menu {
+  position: absolute;
+  z-index: 50;
+  display: grid;
+  gap: 1px;
+  min-width: 220px;
+  padding: 6px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface-raised);
+  box-shadow: var(--shadow-lg);
+  animation: px-pop 140ms var(--ease);
+}
+.px-menu-wide {
+  min-width: 100%;
+  width: max-content;
+  max-width: 300px;
+}
+.px-menu-bottom {
+  top: calc(100% + 6px);
+}
+.px-menu-top {
+  bottom: calc(100% + 6px);
+}
+.px-menu-start {
+  left: 0;
+}
+.px-menu-end {
+  right: 0;
+}
+@keyframes px-pop {
+  from {
+    opacity: 0;
+    transform: translateY(-3px) scale(0.985);
+  }
+}
+.px-menu-label {
+  padding: 6px 10px 4px;
+  color: var(--color-text-subtle);
+  font-size: 0.6875rem;
+  font-weight: 550;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.px-menu-sep {
+  height: 1px;
+  margin: 5px 4px;
+  background: var(--color-border);
+}
+.px-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 34px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--color-text) !important;
+  text-align: left;
+  cursor: pointer;
+}
+.px-menu-item > svg:first-child {
+  color: var(--color-text-subtle);
+}
+.px-menu-item:hover,
+.px-menu-item:focus-visible {
+  outline: none;
+  background: var(--color-hover);
+}
+.px-menu-item:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--color-focus);
+}
+.px-menu-item-label {
+  display: grid;
+  flex: 1;
+  line-height: 1.3;
+}
+.px-menu-item-label small {
+  color: var(--color-text-subtle);
+  font-size: 0.75rem;
+}
+.px-menu-check {
+  color: var(--color-primary);
+}

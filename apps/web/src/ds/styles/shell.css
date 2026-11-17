@@ -1,0 +1,315 @@
+/* Design System oficial — AppShell e barra lateral. Ver base.css. */
+
+/* ------------------------------------------------------------- Shell */
+.px-app {
+  display: grid;
+  grid-template-columns: var(--px-sidebar) minmax(0, 1fr);
+  min-height: calc(100vh - var(--px-bar));
+}
+.px-column {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-left: 1px solid var(--color-border);
+}
+
+.px-sidebar {
+  position: sticky;
+  top: var(--px-bar);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  height: calc(100vh - var(--px-bar));
+  height: calc(100dvh - var(--px-bar));
+  padding: 14px 12px 12px;
+  background: var(--color-chrome);
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.px-brand {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 6px 8px;
+}
+.px-brand-link {
+  display: inline-flex;
+  border-radius: 8px;
+  text-decoration: none;
+}
+.px-brand .brand-logo {
+  --brand-logo-height: 26px;
+  font-weight: 600;
+  font-size: 0.9375rem;
+}
+.px-brand .brand-logo-plate {
+  padding: 4px 8px;
+  border-radius: 7px;
+}
+[data-theme='light'] .px-brand .brand-logo-plate {
+  padding-inline: 0;
+}
+.px-brand .brand-mark,
+.px-org-avatar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--color-primary);
+  color: var(--color-primary-contrast);
+  font-size: 0.6875rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+.px-org-avatar {
+  border-radius: 7px;
+  font-size: 0.625rem;
+}
+
+.px-menu-root {
+  position: relative;
+}
+.px-org-switch {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 120ms var(--ease),
+    background-color 120ms var(--ease);
+}
+.px-org-switch[aria-expanded='true'] {
+  border-color: var(--color-border-strong);
+  background: var(--color-surface-raised);
+}
+.px-org-switch:hover {
+  border-color: var(--color-border-strong);
+}
+.px-org-switch > svg {
+  margin-left: auto;
+  color: var(--color-text-subtle);
+  flex: none;
+}
+.px-org-switch-text {
+  display: grid;
+  min-width: 0;
+  line-height: 1.25;
+}
+.px-org-switch-text strong {
+  overflow: hidden;
+  font-weight: 550;
+  font-size: 0.875rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.px-org-switch-text small {
+  color: var(--color-text-subtle);
+  font-size: 0.75rem;
+}
+.px-org-switch-compact {
+  min-height: 36px;
+  padding: 4px 8px 4px 6px;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  gap: 8px;
+}
+.px-org-switch-compact .px-org-avatar {
+  display: none;
+}
+
+.px-nav {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 4px;
+  margin-top: 14px;
+}
+.px-nav-caption {
+  margin: 0 0 2px;
+  padding: 0 10px;
+  color: var(--color-text-subtle);
+  font-size: 0.75rem;
+  font-weight: 550;
+}
+.px-nav-group {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border);
+}
+.px-collapse {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 180ms var(--ease);
+}
+.px-collapse[data-open='false'] {
+  grid-template-rows: 0fr;
+}
+.px-collapse > div {
+  min-height: 0;
+  overflow: hidden;
+}
+.px-nav-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.px-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-height: 36px;
+  padding: 0 10px;
+  border-radius: 9px;
+  color: var(--color-text-muted);
+  font-weight: 450;
+  text-decoration: none;
+  transition:
+    background-color 120ms var(--ease),
+    color 120ms var(--ease);
+}
+.px-nav-item > svg {
+  flex: none;
+  color: var(--color-text-subtle);
+}
+a.px-nav-item:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+.px-nav-item[aria-current='page'] {
+  font-weight: 500;
+  background: var(--color-selected-bg);
+  color: var(--color-selected-text);
+  box-shadow:
+    var(--shadow-sm),
+    0 0 0 1px var(--color-border);
+}
+.px-nav-item[aria-current='page'] > svg {
+  color: var(--color-primary);
+}
+.px-nav-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.px-nav-count {
+  min-width: 22px;
+  padding: 0 6px;
+  border-radius: 6px;
+  background: var(--color-neutral-bg);
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 550;
+  line-height: 20px;
+  text-align: center;
+}
+.px-nav-group-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 28px;
+  margin-bottom: 2px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--color-text-subtle) !important;
+  font-size: 0.75rem !important;
+  font-weight: 550;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+}
+.px-nav-group-toggle:hover {
+  color: var(--color-text) !important;
+}
+.px-nav-group-toggle .px-soon {
+  margin-left: 2px;
+}
+.px-nav-group-toggle > svg {
+  margin-left: auto;
+}
+.px-nav-group-toggle svg {
+  transition: transform 160ms var(--ease);
+}
+.px-nav-group-toggle[aria-expanded='false'] svg {
+  transform: rotate(-90deg);
+}
+.px-nav-item-disabled {
+  min-height: 32px;
+  color: var(--color-text-subtle);
+  font-size: 0.8125rem;
+  cursor: default;
+}
+.px-nav-item-disabled > svg {
+  opacity: 0.6;
+}
+.px-soon {
+  padding: 0 6px;
+  border-radius: 5px;
+  background: var(--color-neutral-bg);
+  color: var(--color-text-muted);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+.px-sidebar-foot {
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-border);
+}
+.px-account {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+.px-account:hover {
+  background: var(--color-hover);
+}
+.px-account > svg {
+  margin-left: auto;
+  color: var(--color-text-subtle);
+  flex: none;
+}
+.px-account-text {
+  display: grid;
+  min-width: 0;
+  line-height: 1.3;
+}
+.px-account-text strong {
+  font-size: 0.8125rem;
+  font-weight: 550;
+}
+.px-account-text small {
+  overflow: hidden;
+  color: var(--color-text-subtle);
+  font-size: 0.75rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

@@ -1,0 +1,240 @@
+/* Design System oficial — busca "ir para", painel modal, aviso e navegação inferior. Ver base.css. */
+
+/* ------------------------------------------- Busca "ir para" (diálogo) */
+.px-palette,
+.px-sheet {
+  padding: 0;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+  box-shadow: var(--shadow-lg);
+}
+.px-palette::backdrop,
+.px-sheet::backdrop {
+  background: var(--color-backdrop);
+  backdrop-filter: blur(2px);
+}
+.px-palette {
+  width: min(100% - 24px, 600px);
+  max-height: min(70vh, 560px);
+  margin: 12vh auto auto;
+  border-radius: 16px;
+  overflow: hidden;
+}
+.px-palette[open] {
+  display: flex;
+  flex-direction: column;
+  animation: px-pop 160ms var(--ease);
+}
+.px-palette-input {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-subtle);
+}
+.px-palette-input:focus-within {
+  box-shadow: inset 0 -2px 0 var(--color-focus);
+}
+.px-palette-input input:focus-visible {
+  outline: none;
+}
+.px-palette-input input {
+  flex: 1;
+  min-height: 52px;
+  border: 0;
+  background: none;
+  color: var(--color-text);
+  font: inherit;
+  font-size: 1rem;
+  outline: none;
+}
+.px-palette-input input::placeholder {
+  color: var(--color-text-subtle);
+}
+.px-palette-list {
+  flex: 1;
+  margin: 0;
+  padding: 6px;
+  overflow-y: auto;
+  list-style: none;
+}
+.px-palette-group {
+  padding: 10px 10px 4px;
+  color: var(--color-text-subtle);
+  font-size: 0.6875rem;
+  font-weight: 550;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.px-palette-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 40px;
+  padding: 6px 10px;
+  border-radius: 9px;
+  cursor: pointer;
+}
+.px-palette-item > svg {
+  flex: none;
+  color: var(--color-text-subtle);
+}
+.px-palette-item[aria-selected='true'] {
+  background: var(--color-hover);
+  box-shadow: inset 2px 0 0 var(--color-primary);
+}
+.px-palette-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.px-palette-meta {
+  display: flex;
+  gap: 12px;
+  color: var(--color-text-subtle);
+  font-size: 0.8125rem;
+  white-space: nowrap;
+}
+.px-palette-empty {
+  margin: 0;
+  padding: 18px;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+.px-palette-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface-muted);
+  color: var(--color-text-subtle);
+  font-size: 0.75rem;
+}
+.px-palette-scope {
+  margin-left: auto;
+}
+
+/* ------------------------------------------------------- Aviso (toast) */
+.px-toast-region {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  z-index: 80;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.px-toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface-raised);
+  box-shadow: var(--shadow-lg);
+  font-size: 0.875rem;
+  white-space: nowrap;
+  animation: px-pop 180ms var(--ease);
+}
+.px-toast svg {
+  color: var(--color-success);
+}
+
+/* -------------------------------------------- Navegação inferior/sheet */
+.px-bottom-nav {
+  display: none;
+}
+.px-sheet {
+  width: 100%;
+  max-width: 520px;
+  max-height: 86vh;
+  margin: auto auto 0;
+  border-radius: 20px 20px 0 0;
+  border-bottom: 0;
+}
+.px-sheet[open] {
+  animation: px-sheet-in 220ms var(--ease);
+}
+@keyframes px-sheet-in {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+}
+.px-sheet-body {
+  display: grid;
+  gap: 18px;
+  padding: 18px 16px calc(18px + env(safe-area-inset-bottom));
+}
+.px-sheet-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.px-sheet-head .px-icon-btn {
+  margin-left: auto;
+}
+.px-sheet-title {
+  margin: 0 0 6px 10px;
+  color: var(--color-text-subtle);
+  font-size: 0.75rem !important;
+  font-weight: 550 !important;
+}
+.px-sheet-actions {
+  display: grid;
+  gap: 8px;
+}
+.px-sheet-actions .btn {
+  min-height: 44px;
+}
+.px-mode-switch {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  margin: 0;
+  padding: 4px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface-muted);
+}
+.px-mode-switch legend {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.px-mode-switch label {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  border-radius: 9px;
+  color: var(--color-text-muted);
+  font-weight: 500;
+  cursor: pointer;
+}
+.px-mode-switch input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.px-mode-switch label:has(input:checked) {
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow:
+    var(--shadow-sm),
+    0 0 0 1px var(--color-border);
+}
+.px-mode-switch label:has(input:focus-visible) {
+  outline: 2px solid var(--color-focus);
+}

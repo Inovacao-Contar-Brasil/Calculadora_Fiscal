@@ -1,0 +1,193 @@
+/* Design System oficial — tabela, pessoa, situação, contagem e estado vazio. Ver base.css. */
+
+/* ------------------------------------------------------------ Tabela */
+
+.px-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+.px-table th {
+  padding: 8px 14px;
+  border-top: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface-muted);
+  color: var(--color-text-subtle);
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-align: left;
+  white-space: nowrap;
+}
+.px-table th:first-child,
+.px-table td:first-child {
+  padding-left: var(--px-panel-x);
+}
+.px-table th:last-child,
+.px-table td:last-child {
+  padding-right: var(--px-panel-x);
+}
+.px-table td {
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: middle;
+}
+.px-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.px-table tbody tr {
+  position: relative;
+  transition: background-color 120ms var(--ease);
+}
+.px-table tbody tr:hover {
+  background: var(--color-hover);
+}
+.px-cell-title {
+  width: 100%;
+  max-width: 0;
+  min-width: 200px;
+}
+/* Títulos quebram em até duas linhas em vez de truncar. */
+.px-row-link {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow-wrap: anywhere;
+  color: var(--color-text);
+  font-weight: 480;
+}
+.px-row-link {
+  color: var(--color-text) !important;
+  text-decoration: none;
+}
+/* A linha inteira é clicável pelo link do título. */
+.px-row-link::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+.px-row-link:focus-visible {
+  outline: none;
+}
+.px-row-link:focus-visible::after {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+  border-radius: 6px;
+}
+.px-cell-sub {
+  display: block;
+  margin-top: 2px;
+  color: var(--color-text-subtle);
+  font-size: 0.75rem;
+}
+
+.px-table-foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  padding: 12px var(--px-panel-x);
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-subtle);
+  font-size: 0.8125rem;
+}
+
+.px-person {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-text);
+}
+.px-person-empty {
+  color: var(--color-text-subtle);
+  font-style: italic;
+}
+.px-avatar {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  border-radius: 999px;
+  background: var(--color-neutral-bg);
+  color: var(--color-text-muted);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1;
+}
+.px-avatar-brand {
+  background: var(--color-primary);
+  color: var(--color-primary-contrast);
+}
+.px-avatar-empty {
+  width: 24px;
+  height: 24px;
+  border: 1px dashed var(--color-border-control);
+  background: transparent;
+  color: var(--color-text-subtle);
+}
+
+.px-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+.px-status-dot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 999px;
+  background: var(--status-color);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--status-color) 18%, transparent);
+}
+
+.px-count {
+  padding: 0 7px;
+  border-radius: 6px;
+  font-size: 0.6875rem;
+  font-weight: 550;
+  line-height: 20px;
+  white-space: nowrap;
+}
+.px-count-neutral {
+  background: var(--color-neutral-bg);
+  color: var(--color-text-muted);
+}
+.px-count-danger {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+/* ------------------------------------------------------------ Vazio */
+.px-empty {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 32px 24px 36px;
+  text-align: center;
+}
+.px-empty-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 4px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface-muted);
+  color: var(--color-text-subtle);
+}
+.px-empty strong {
+  font-weight: 550;
+}
+.px-empty-text {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  max-width: 420px;
+  color: var(--color-text-muted);
+}
+.px-empty-text p {
+  margin: 0;
+}
