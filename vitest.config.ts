@@ -13,6 +13,15 @@ export default defineConfig({
       },
       {
         test: {
+          name: "web",
+          // Componentes React e fronteiras do Design System (apps/web/test).
+          environment: "jsdom",
+          include: ["apps/web/test/**/*.test.{ts,tsx}"],
+          setupFiles: ["apps/web/test/setup.ts"],
+        },
+      },
+      {
+        test: {
           name: "api",
           environment: "node",
           include: ["apps/api/src/**/*.test.ts"],
