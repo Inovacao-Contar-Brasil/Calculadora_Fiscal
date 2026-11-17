@@ -1,0 +1,18 @@
+{
+  "name": "@calculadora-fiscal/domain",
+  "private": true,
+  "version": "0.2.0",
+  "type": "module",
+  "description": "Domínio puro da Calculadora Fiscal: leitura de NF-e e contratos do motor tributário. Sem dependência de framework, banco ou interface.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./nfe": "./src/nfe/index.ts",
+    "./tributario": "./src/tributario/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "fast-xml-parser": "^5.2.5"
+  }
+}
