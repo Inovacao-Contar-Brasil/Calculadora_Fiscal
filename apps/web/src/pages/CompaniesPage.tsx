@@ -48,7 +48,7 @@ export function CompaniesPage() {
                       </AppLink>
                       {company.tradeName && <span className="px-cell-sub">{company.legalName}</span>}
                     </td>
-                    <td data-label="CNPJ" className="num">{formatCnpj(company.cnpj)}</td>
+                    <td data-label="CNPJ" className="num cf-nowrap">{formatCnpj(company.cnpj)}</td>
                     <td data-label="UF">{company.uf}</td>
                     <td data-label="Situação">
                       {company.active ? <Status tone="success">Ativa</Status> : <Status tone="neutral" outline>Inativa</Status>}

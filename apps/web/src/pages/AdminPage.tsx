@@ -93,7 +93,7 @@ function CompaniesAdmin({ orgId }: { orgId: string }) {
                     <AppLink href={"/empresas/" + c.id} className="px-row-link">{c.legalName}</AppLink>
                     {c.tradeName && <span className="px-cell-sub">{c.tradeName}</span>}
                   </td>
-                  <td data-label="CNPJ" className="num">{formatCnpj(c.cnpj)}</td>
+                  <td data-label="CNPJ" className="num cf-nowrap">{formatCnpj(c.cnpj)}</td>
                   <td data-label="UF">{c.uf}</td>
                 </tr>
               ))}

@@ -15,10 +15,9 @@
 }
 
 /* Nota permanente do rodapé do conteúdo: nenhum valor é definitivo */
+/* Dentro de .px-main, que já aplica a margem lateral da página. */
 .cf-footnote {
-  width: min(100%, var(--px-content-max));
-  margin: 0 auto;
-  padding: 8px var(--px-gutter) 32px;
+  margin: 28px 0 0;
   color: var(--color-text-subtle);
   font-size: 0.75rem;
 }
@@ -86,18 +85,20 @@
 }
 
 /* ------------------------------------------------ Totais e identificação */
+/* Grade com linhas de 1px (fundo da borda aparecendo no espaço entre células). */
 .cf-metrics {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1px;
   margin: 0;
   border-top: 1px solid var(--color-border);
+  background: var(--color-border);
 }
 .cf-metrics div {
   display: grid;
   gap: 4px;
   padding: var(--px-panel-y) var(--px-panel-x);
-  border-right: 1px solid var(--color-border);
-  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
 }
 .cf-metrics dt {
   color: var(--color-text-subtle);
@@ -109,11 +110,21 @@
   font-weight: 550;
   letter-spacing: -0.02em;
 }
+/* O total declarado ocupa a linha inteira: é o número que a pessoa procura. */
 .cf-metrics .cf-metric-total {
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
   background: var(--color-surface-muted);
 }
 .cf-metrics .cf-metric-total dd {
   color: var(--color-primary);
+  font-size: 1.5rem;
+}
+
+/* Identificadores fiscais (CNPJ) não quebram no meio. */
+.cf-nowrap {
+  white-space: nowrap;
 }
 
 /* Chave de acesso e hash: quebra em qualquer ponto, números tabulares */
@@ -140,5 +151,37 @@
   .cf-dl-wide div {
     grid-template-columns: minmax(0, 1fr);
     gap: 2px;
+  }
+}
+
+/*
+ * Tabelas de dados fiscais no celular: o kit vira cada linha em um bloco
+ * compacto sem rótulos (bom para listas autoexplicativas). Valores fiscais
+ * soltos ("6102", "Não informado") são ambíguos, então aqui cada célula ganha
+ * o próprio rótulo e os subtextos (CEST, CST, preço) continuam visíveis.
+ * Mesmo ponto de quebra do kit (responsive.css: 899px).
+ */
+@media (max-width: 899px) {
+  .cf-table-labeled tbody tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+  }
+  .cf-table-labeled td[data-label] {
+    display: grid;
+    grid-template-columns: 132px minmax(0, 1fr);
+    gap: 8px;
+    font-size: 0.875rem;
+  }
+  .cf-table-labeled td[data-label]::before {
+    content: attr(data-label);
+    color: var(--color-text-subtle);
+    font-size: 0.8125rem;
+  }
+  .cf-table-labeled td[data-label] > .px-cell-sub {
+    grid-column: 2;
+  }
+  .cf-table-labeled .px-cell-sub {
+    display: block;
   }
 }

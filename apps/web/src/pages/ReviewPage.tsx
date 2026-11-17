@@ -203,22 +203,8 @@ export function ReviewDetailPage({ id }: { id: string }) {
         )}
 
         <PanelGrid>
-          <Panel title="Decisão registrada" span="side" flush>
-            {item.decision || item.justification ? (
-              <dl className="px-dl cf-dl-wide">
-                {item.decision?.enquadramento && <div><dt>Enquadramento</dt><dd>{item.decision.enquadramento}</dd></div>}
-                {item.decision?.fundamentoLegal && <div><dt>Fundamento legal</dt><dd>{item.decision.fundamentoLegal}</dd></div>}
-                {item.decision?.observacoes && <div><dt>Observações</dt><dd>{item.decision.observacoes}</dd></div>}
-                {item.justification && <div><dt>Justificativa</dt><dd>{item.justification}</dd></div>}
-                {item.decision && <div><dt>Vigência</dt><dd className="num">{formatDate(item.validFrom)} → {item.validTo ? formatDate(item.validTo) : "em aberto"}</dd></div>}
-                {item.decidedAt && <div><dt>Decidido em</dt><dd className="num">{formatDateTime(item.decidedAt)}</dd></div>}
-              </dl>
-            ) : (
-              <p className="px-aside-note">Nenhuma decisão registrada para este produto.</p>
-            )}
-          </Panel>
           <Panel title="Ocorrências em NF-e" description={<>Últimas <span className="num">{occurrences.length}</span> ocorrência(s) deste produto na empresa</>} span="main" flush>
-            <Table>
+            <Table className="cf-table-labeled">
               <thead>
                 <tr>
                   <th scope="col">NF-e</th>
@@ -242,6 +228,20 @@ export function ReviewDetailPage({ id }: { id: string }) {
                 ))}
               </tbody>
             </Table>
+          </Panel>
+          <Panel title="Decisão registrada" span="side" flush>
+            {item.decision || item.justification ? (
+              <dl className="px-dl cf-dl-wide">
+                {item.decision?.enquadramento && <div><dt>Enquadramento</dt><dd>{item.decision.enquadramento}</dd></div>}
+                {item.decision?.fundamentoLegal && <div><dt>Fundamento legal</dt><dd>{item.decision.fundamentoLegal}</dd></div>}
+                {item.decision?.observacoes && <div><dt>Observações</dt><dd>{item.decision.observacoes}</dd></div>}
+                {item.justification && <div><dt>Justificativa</dt><dd>{item.justification}</dd></div>}
+                {item.decision && <div><dt>Vigência</dt><dd className="num">{formatDate(item.validFrom)} → {item.validTo ? formatDate(item.validTo) : "em aberto"}</dd></div>}
+                {item.decidedAt && <div><dt>Decidido em</dt><dd className="num">{formatDateTime(item.decidedAt)}</dd></div>}
+              </dl>
+            ) : (
+              <p className="px-aside-note">Nenhuma decisão registrada para este produto.</p>
+            )}
           </Panel>
           {history.length > 0 && (
             <Panel title="Outras decisões para este produto" span="full" flush>

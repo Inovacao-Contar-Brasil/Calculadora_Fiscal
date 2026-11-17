@@ -66,7 +66,7 @@ export function DocumentPage({ id }: { id: string }) {
             </Panel>
           )}
           <Panel title="Produtos" description={<><span className="num">{items.length}</span> {items.length === 1 ? "item" : "itens"} · valores exatamente como declarados na NF-e</>} span="full" flush>
-            <Table>
+            <Table className="cf-table-labeled">
               <thead>
                 <tr>
                   <th scope="col">Item / Produto</th>

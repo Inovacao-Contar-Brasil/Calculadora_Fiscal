@@ -263,7 +263,7 @@ function FiscalTab({ companyId, staff, onChanged }: { companyId: string; staff: 
         <EmptyState icon="layers" title="Nenhuma versão de cadastro fiscal registrada" />
       ) : (
         <Panel title="Versões do cadastro fiscal" description="Histórico completo; a versão vigente não possui data de fim." flush>
-          <Table>
+          <Table className="cf-table-labeled">
             <thead>
               <tr>
                 <th scope="col">Versão</th>
