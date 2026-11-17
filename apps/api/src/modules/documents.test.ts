@@ -183,7 +183,7 @@ describe("importação persistente de NF-e, histórico e revisão fiscal", () =>
       responses = [await importXml(xmlA), await importXml(xmlB)];
     }
     expect(responses.map((r) => r.status)).toEqual([201, 201]);
-    expect(responses[0].body.document.id).not.toBe(responses[1].body.document.id);
+    expect(responses[0]!.body.document.id).not.toBe(responses[1]!.body.document.id);
     const queue = await h.request({ method: "GET", url: "/api/review-items?companyId=" + company.id, cookie: fiscal });
     const matching = queue.body.items.filter((r: { description: string }) => r.description === item.description);
     expect(matching).toHaveLength(1);
