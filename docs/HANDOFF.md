@@ -2,6 +2,18 @@
 
 > Leia junto com `CLAUDE.md`. Atualize este arquivo após cada marco e antes de encerrar a sessão. Não dependa do histórico de nenhuma conversa: tudo o que importa está aqui, nos commits e nas Issues.
 
+## Atualização 17/11/2026 — revisão independente, sem Fable
+
+- **Issue #8 parcialmente corrigida diretamente pelo GitHub**, no PR #7 ainda em draft e sem merge:
+  - `dbaef8b3`: testes negativos exigem que clientes não acessem a fila ou detalhes internos de revisão; execução inicial falhou como esperado (teste antes do fix).
+  - `b5019331`: listagem restrita a staff por organização e detalhe protegido por `loadReviewForStaff`; CI push/PR aprovado (PostgreSQL e PGlite).
+  - `6f30ddfa`: regressão para duas NF-e distintas simultâneas com o mesmo fingerprint no PostgreSQL; sequencial no PGlite, e produto repetido em linhas.
+  - `b63ed3da`: substitui SELECT → INSERT por UPSERT atômico em `review_items_open_idx`, preserva ocorrências por documento.
+- **Atenção:** conferir o CI do último SHA `b63ed3da` antes de declarar a correção de concorrência aprovada; os commits são incrementais e os commits apenas de testes podem falhar intencionalmente.
+- **Ainda bloqueado na Issue #8:** pendências fora da data de vigência de homologação permanecem sem fluxo próprio de resolução. Requer modelo e testes para histórico temporal; não ocultar pendência nem presumir tributação.
+- **Operação:** antes de merge, executar `npm.cmd ci` e `npm.cmd run verify` no Windows, teste ponta a ponta no navegador e revisão humana final. Não iniciar cálculos fiscais, não publicar NF-e reais no Git e não fazer merge automático.
+- **PR #1:** encerrado sem merge; sua branch é ancestral do PR #7, comprovado pelo compare no GitHub.
+
 ## Situação em 16/11/2026
 
 - **Sprint 1 (Issue #2):** fundação implementada. **Gate de qualidade (Issue #5): CI verde no PostgreSQL real**, vulnerabilidades tratadas, PGlite corrigido, revisão de segurança feita. Falta só o que depende de pessoas (ver "Pendências").
