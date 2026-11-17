@@ -73,11 +73,19 @@ export async function reviewRoutes(fastify: FastifyInstance): Promise<void> {
     },
     async (request) => {
       const principal = requireAuth(request);
+      // A fila contém dados internos (justificativas, responsáveis e decisões).
+      // Um usuário pode ser fiscal numa organização e cliente em outra:
+      // a listagem deve considerar APENAS empresas de organizações com papel staff.
+      const staffOrgs = new Set(principal.memberships.filter((m) => isStaff(m.role)).map((m) => m.organizationId));
       const visible = await listVisibleCompanies(app.db, principal);
-      let companyIds = visible.map((c) => c.id);
+      let companyIds = visible.filter((c) => staffOrgs.has(c.organizationId)).map((c) => c.id);
       if (request.query.companyId) {
-        if (!companyIds.includes(request.query.companyId)) throw notFound("Empresa não encontrada.");
+        // Preserve 404 para empresas fora do escopo e 403 para cliente com acesso.
+        if (!visible.some((c) => c.id === request.query.companyId)) throw notFound("Empresa não encontrada.");
+        if (!companyIds.includes(request.query.companyId)) throw forbidden();
         companyIds = [request.query.companyId];
+      } else if (staffOrgs.size === 0) {
+        throw forbidden();
       }
       if (!companyIds.length) return { items: [] };
       const conditions = [inArray(reviewItems.companyId, companyIds), isNull(reviewItems.validTo)];
@@ -95,8 +103,9 @@ export async function reviewRoutes(fastify: FastifyInstance): Promise<void> {
 
   app.get("/api/review-items/:id", { schema: { params: idParams } }, async (request) => {
     const principal = requireAuth(request);
-    const row = (await app.db.select().from(reviewItems).where(eq(reviewItems.id, request.params.id)).limit(1))[0];
-    if (!row) throw notFound(REVIEW_NOT_FOUND);
+    // Consulta administrativa: cliente acessa status dos próprios documentos,
+    // não justificativas, atribuições ou histórico de decisões internas.
+    const row = await loadReviewForStaff(app.db, principal, request.params.id);
     const { company } = await loadAccessibleCompany(app.db, principal, row.companyId).catch(asNotFound(REVIEW_NOT_FOUND));
     const occurrences = await app.db
       .select({ documentId: nfeDocuments.id, number: nfeDocuments.number, issuedAt: nfeDocuments.issuedAt, issuerName: nfeDocuments.issuerName, line: nfeItems.line, productCents: nfeItems.productCents, classificationStatus: nfeItems.classificationStatus })
