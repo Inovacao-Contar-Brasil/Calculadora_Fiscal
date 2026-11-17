@@ -103,12 +103,24 @@ describe("isolamento entre empresas e organizações", () => {
   });
 
   it("fila de revisão respeita o escopo e cliente não decide", async () => {
+    // O cliente acompanha apenas o status de seus documentos, nunca o workflow interno.
     const listA = await h.request({ method: "GET", url: "/api/review-items", cookie: cookieA });
-    expect(listA.body.items).toHaveLength(1);
-    const reviewId = listA.body.items[0].id;
+    expect(listA.status).toBe(403);
+    const listFiscal = await h.request({ method: "GET", url: "/api/review-items", cookie: cookieFiscal1 });
+    expect(listFiscal.status).toBe(200);
+    expect(listFiscal.body.items).toHaveLength(1);
+    const reviewId = listFiscal.body.items[0].id;
     const listB = await h.request({ method: "GET", url: "/api/review-items", cookie: cookieB });
-    expect(listB.body.items).toHaveLength(0);
+    expect(listB.status).toBe(403);
+    expect((await h.request({ method: "GET", url: "/api/review-items?companyId=" + companyA.id, cookie: cookieA })).status).toBe(403);
     expect((await h.request({ method: "GET", url: "/api/review-items?companyId=" + companyA.id, cookie: cookieB })).status).toBe(404);
+    expect((await h.request({ method: "GET", url: "/api/review-items/" + reviewId, cookie: cookieA })).status).toBe(403);
+    expect((await h.request({ method: "GET", url: "/api/review-items/" + reviewId, cookie: cookieAdmin1 })).status).toBe(200);
+    expect((await h.request({ method: "GET", url: "/api/review-items/" + reviewId, cookie: cookieFiscal1 })).status).toBe(200);
+    // O cliente mantém acesso ao próprio documento e aos status dos itens.
+    const ownDocument = await h.request({ method: "GET", url: "/api/documents/" + documentA, cookie: cookieA });
+    expect(ownDocument.status).toBe(200);
+    expect(ownDocument.body.items[0].classificationStatus).toBe("PENDENTE_REVISAO");
     expect((await h.request({ method: "GET", url: "/api/review-items/" + reviewId, cookie: cookieB })).status).toBe(404);
     expect((await h.request({ method: "GET", url: "/api/review-items/" + reviewId, cookie: cookieFiscal2 })).status).toBe(404);
 
@@ -135,7 +147,7 @@ describe("isolamento entre empresas e organizações", () => {
       ["/api/documents/" + documentA, "/api/documents/" + missing],
       ["/api/documents/" + documentA + "/xml", "/api/documents/" + missing + "/xml"],
     ];
-    const reviewId = (await h.request({ method: "GET", url: "/api/review-items", cookie: cookieA })).body.items[0].id;
+    const reviewId = (await h.request({ method: "GET", url: "/api/review-items", cookie: cookieFiscal1 })).body.items[0].id;
     pairs.push(["/api/review-items/" + reviewId, "/api/review-items/" + missing]);
     for (const [existing, absent] of pairs) {
       const outOfScope = await h.request({ method: "GET", url: existing, cookie: cookieB });
@@ -146,13 +158,13 @@ describe("isolamento entre empresas e organizações", () => {
   });
 
   it("decisões de revisão: cliente sem acesso e outra organização recebem 404; cliente com acesso recebe 403", async () => {
-    const reviewId = (await h.request({ method: "GET", url: "/api/review-items", cookie: cookieA })).body.items[0].id;
+    const reviewId = (await h.request({ method: "GET", url: "/api/review-items", cookie: cookieFiscal1 })).body.items[0].id;
     const reopen = { validTo: "2026-12-31", reason: "teste de escopo" };
     // Cliente B é da mesma organização, mas sem acesso à empresa A: não pode saber que o item existe.
     expect((await h.request({ method: "PATCH", url: "/api/review-items/" + reviewId, cookie: cookieB, payload: { status: "PENDENTE_REVISAO" } })).status).toBe(404);
     expect((await h.request({ method: "POST", url: "/api/review-items/" + reviewId + "/reopen", cookie: cookieB, payload: reopen })).status).toBe(404);
     expect((await h.request({ method: "POST", url: "/api/review-items/" + reviewId + "/reopen", cookie: cookieFiscal2, payload: reopen })).status).toBe(404);
-    // Cliente A vê o item, mas não decide.
+    // Cliente A pode ver seu documento, mas não pode ler ou alterar a revisão administrativa.
     expect((await h.request({ method: "POST", url: "/api/review-items/" + reviewId + "/reopen", cookie: cookieA, payload: reopen })).status).toBe(403);
   });
 
