@@ -171,6 +171,35 @@ describe("importação persistente de NF-e, histórico e revisão fiscal", () =>
     expect((await h.request({ method: "PATCH", url: "/api/review-items/" + reviewPastilha, cookie: fiscal, payload: { status: "EM_ANALISE" } })).status).toBe(422);
   });
 
+  it("importações simultâneas de NF-e distintas preservam uma revisão e contabilizam ocorrências por nota", async () => {
+    // Em PostgreSQL real, exercitar a corrida; PGlite usa conexão única e roda sequencialmente.
+    const item = { ...ITEM_PASTILHA, code: "CONC-IMPORT", description: "PRODUTO NOVO SINTETICO CONCORRENTE", ncm: "12345678", cest: undefined };
+    const xmlA = syntheticNfe({ number: "7201", recipientCnpj: company.cnpj, items: [item] });
+    const xmlB = syntheticNfe({ number: "7202", recipientCnpj: company.cnpj, items: [item] });
+    let responses;
+    if (h.kind === "postgres") {
+      responses = await Promise.all([importXml(xmlA), importXml(xmlB)]);
+    } else {
+      responses = [await importXml(xmlA), await importXml(xmlB)];
+    }
+    expect(responses.map((r) => r.status)).toEqual([201, 201]);
+    expect(responses[0].body.document.id).not.toBe(responses[1].body.document.id);
+    const queue = await h.request({ method: "GET", url: "/api/review-items?companyId=" + company.id, cookie: fiscal });
+    const matching = queue.body.items.filter((r: { description: string }) => r.description === item.description);
+    expect(matching).toHaveLength(1);
+    expect(matching[0].occurrences).toBe(2);
+    for (const response of responses) {
+      const detail = await h.request({ method: "GET", url: "/api/documents/" + response.body.document.id, cookie: cliente });
+      expect(detail.body.items[0].reviewItemId).toBe(matching[0].id);
+    }
+    // Produto repetido em duas linhas da mesma NF-e não conta como duas notas.
+    const repeated = await importXml(syntheticNfe({ number: "7203", recipientCnpj: company.cnpj, items: [item, { ...item, code: "OUTRA-LINHA" }] }));
+    expect(repeated.status).toBe(201);
+    expect(repeated.body.document.itemCount).toBe(2);
+    const after = await h.request({ method: "GET", url: "/api/review-items?companyId=" + company.id, cookie: fiscal });
+    expect(after.body.items.find((r: { id: string }) => r.id === matching[0].id).occurrences).toBe(3);
+  });
+
   it("histórico lista as notas da empresa em ordem decrescente de importação", async () => {
     const history = await h.request({ method: "GET", url: "/api/companies/" + company.id + "/documents?limit=2", cookie: cliente });
     expect(history.body.total).toBe(3);
