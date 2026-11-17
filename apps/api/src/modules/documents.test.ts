@@ -171,6 +171,13 @@ describe("importação persistente de NF-e, histórico e revisão fiscal", () =>
     expect((await h.request({ method: "PATCH", url: "/api/review-items/" + reviewPastilha, cookie: fiscal, payload: { status: "EM_ANALISE" } })).status).toBe(422);
   });
 
+  it("histórico lista as notas da empresa em ordem decrescente de importação", async () => {
+    const history = await h.request({ method: "GET", url: "/api/companies/" + company.id + "/documents?limit=2", cookie: cliente });
+    expect(history.body.total).toBe(3);
+    expect(history.body.documents).toHaveLength(2);
+    expect(history.body.documents[0].number).toBe("7004");
+    expect(history.body.documents.every((d: Record<string, unknown>) => !("rawXml" in d))).toBe(true);
+  });
   it("importações simultâneas de NF-e distintas preservam uma revisão e contabilizam ocorrências por nota", async () => {
     // Em PostgreSQL real, exercitar a corrida; PGlite usa conexão única e roda sequencialmente.
     const item = { ...ITEM_PASTILHA, code: "CONC-IMPORT", description: "PRODUTO NOVO SINTETICO CONCORRENTE", ncm: "12345678", cest: undefined };
@@ -200,11 +207,5 @@ describe("importação persistente de NF-e, histórico e revisão fiscal", () =>
     expect(after.body.items.find((r: { id: string }) => r.id === matching[0].id).occurrences).toBe(3);
   });
 
-  it("histórico lista as notas da empresa em ordem decrescente de importação", async () => {
-    const history = await h.request({ method: "GET", url: "/api/companies/" + company.id + "/documents?limit=2", cookie: cliente });
-    expect(history.body.total).toBe(3);
-    expect(history.body.documents).toHaveLength(2);
-    expect(history.body.documents[0].number).toBe("7004");
-    expect(history.body.documents.every((d: Record<string, unknown>) => !("rawXml" in d))).toBe(true);
-  });
+
 });
