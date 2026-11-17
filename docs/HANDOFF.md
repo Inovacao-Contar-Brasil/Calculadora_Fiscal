@@ -2,6 +2,15 @@
 
 > Leia junto com `CLAUDE.md`. Atualize este arquivo após cada marco e antes de encerrar a sessão. Não dependa do histórico de nenhuma conversa: tudo o que importa está aqui, nos commits e nas Issues.
 
+## Atualização de 17/11/2026 — Design System do Hub no frontend
+
+- **Branch:** `claude/calculadora-fiscal-sprint1-estab-c0d3ou`, criada a partir de `feat/sprint1-fundacao-segura` @ `3df1247` (o PR #7 **não** recebeu estas mudanças, para não misturar a revisão da Sprint 1). Sem PR aberto. O CI (`.github/workflows/ci.yml`) só dispara em `main` e `feat/**`: esta branch **não roda CI**; a verificação abaixo é local. Para CI, abrir PR para `main` ou mover os commits para uma branch `feat/*`.
+- **Commits:** `f67c517` importação do DS + marca · `242abf8` telas sobre o DS · `d86942c` testes do web · `b649bdc` ajustes da conferência visual · (este) docs.
+- **O que mudou:** o frontend usa o Design System oficial do Hub Premium v1.2 (cópia em `apps/web/src/ds` + `src/theme`, origem `Hub_ContarBrasil@10f40b2`; adaptações em `apps/web/src/ds/ORIGEM.md`; decisão em `docs/adr/ADR-008-design-system-hub.md`). Marca **Calculadora Fiscal** (monograma CF, verde #366847), sem logotipos nem dados do Hub. Todas as telas e funcionalidades preservadas; modo claro/escuro/sistema; shell com navegação inferior no celular; busca Ctrl K.
+- **Verificação local:** `npm run verify` verde — 153 testes (85 novos do projeto `web`: fronteiras do DS, 57 pares WCAG AA da marca nos dois modos, integração de login/navegação por papel/tema), typecheck e build. Conferência visual em Chromium (Playwright) com dados sintéticos: 10 telas + estados (menu da conta, painel "Mais", busca, formulário de homologação) × claro/escuro × 1440/390 px = 56 cenários, **sem rolagem horizontal, sem violação de CSP, sem erro de console** além do 401 esperado de `/api/auth/me` antes do login. Capturas fora do git.
+- **Não feito / pendente:** lint (o projeto não tem ESLint; o teste de fronteiras cobre as regras visuais e o `tsc` estrito, o restante); teste com leitor de tela, Safari, Firefox e aparelhos físicos; aprovação visual humana da marca verde e das telas; logotipo oficial da Calculadora (hoje monograma). `picomatch` (dev, sem correção publicada) registrado em `docs/SEGURANCA.md`.
+- **Observação do servidor:** com `WEB_DIST_DIR`, o `@fastify/static` (`wildcard: false`) só conhece os arquivos existentes ao subir — após `npm run build` do web, reinicie a API (senão os assets novos caem no fallback da SPA).
+
 ## Situação em 16/11/2026
 
 - **Sprint 1 (Issue #2):** fundação implementada. **Gate de qualidade (Issue #5): CI verde no PostgreSQL real**, vulnerabilidades tratadas, PGlite corrigido, revisão de segurança feita. Falta só o que depende de pessoas (ver "Pendências").

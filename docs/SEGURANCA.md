@@ -84,3 +84,9 @@ Documento de trabalho da Sprint 1. Complementa as ADRs 002, 003 e 005.
 Resultado: `npm audit --omit=dev` → **0**; `npm audit` → **4 moderate**, todas da linha do `esbuild` acima.
 
 Nota operacional: com npm 10.9 o `npm install` da árvore do Vitest 4 falha com `Cannot read properties of null (reading 'edgesOut')` (bug do arborist). O lockfile foi resolvido com `npx npm@11 install` e validado com npm 10 em `npm ci` e `npm install`. Se precisar mexer de novo na árvore do Vitest, use `npx npm@11 install` e depois `npm ci` com o npm do Node 22.
+
+### Atualização de 17/11/2026 (Design System no web)
+
+- Novas dependências do web: `@fontsource-variable/inter` 5.3.0 (OFL, auto-hospedada — sem host externo, compatível com a CSP `default-src 'self'`), `zod` ^4 (já usado pela API) e, só em desenvolvimento, jsdom 27.4.0 e Testing Library. `npm audit --omit=dev`: **0**.
+- **Nova advisory de desenvolvimento, preexistente:** `picomatch` ≤ 4.0.7 (GHSA-fc5q-39xc-vjpf, ReDoS por extglobs), via `vite`, `vitest`, `fdir` e `tinyglobby` (5 entradas "high"). A mesma versão já estava na árvore antes desta mudança; a faixa afetada é `*` e **não há versão corrigida publicada**. Afeta só ferramentas de build/teste com padrões de arquivo controlados pelo projeto — nada em produção. Risco aceito até sair correção; não usar `npm audit fix --force` (rebaixaria o Vitest).
+- `npm audit` total: 9 (4 moderate = esbuild via drizzle-kit, já documentado; 5 high = picomatch acima).

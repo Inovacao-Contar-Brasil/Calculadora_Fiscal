@@ -18,6 +18,7 @@ Plataforma SaaS da Contar Brasil para consulta tributária por produto a partir 
 8. **Atualize `docs/HANDOFF.md`** após cada marco e antes de encerrar a sessão.
 9. **Classificação de item vem só de `classificationFor`** (`apps/api/src/modules/classification.ts`), na importação e na propagação. Homologação vale só dentro da vigência. Classificação homologada **não** autoriza cálculo (ADR-007).
 10. **Testes nunca apagam nada em banco compartilhado.** Os arquivos de teste rodam em paralelo; com `TEST_DATABASE_URL` cada harness cria e remove o próprio banco `cf_test_*` (`apps/api/src/test/pg-test-database.ts`).
+11. **Interface só pelo Design System** (ADR-008): telas importam de `apps/web/src/ds` (API pública `ds/index`), nunca de subpastas de `ds/` nem de `theme/`. Cores só por token (`var(--color-*)`); nada de hexadecimal em folhas. Estilo próprio do produto vai em `pages/pages.css` (prefixo `cf-`). Não altere `ds/`, `theme/` nem `styles/global.css` (cópia do Hub — ver `ds/ORIGEM.md`), exceto a identidade em `theme/brand.ts`; procure o componente antes de criar outro. `apps/web/test/design-system-boundaries.test.ts` reprova violações.
 
 ## Estrutura
 
@@ -35,7 +36,11 @@ apps/api/             Fastify 5 + Zod 4 + Drizzle ORM (PostgreSQL / PGlite)
   src/db/schema.ts    esquema; drizzle/ migrações SQL geradas
   src/test/           harness (PGlite em memória ou banco exclusivo via TEST_DATABASE_URL) e fixtures
 apps/web/             React 19 + Vite; SPA autenticada; roteador próprio (src/router.tsx)
-docs/adr/             decisões arquiteturais (ADR-001…007; 007 = catálogo legal e triagem, proposta)
+  src/ds/, src/theme/ Design System oficial do Hub (cópia; ORIGEM.md) + marca Calculadora Fiscal (theme/brand.ts)
+  src/AppLayout.tsx   shell (Sidebar/Header/BottomNav) com itens por papel
+  src/pages/          telas; pages.css = estilos do módulo (cf-, só tokens)
+  test/               fronteiras do DS, contraste WCAG da marca, integração das telas (jsdom)
+docs/adr/             decisões arquiteturais (ADR-001…008; 007 = catálogo legal e triagem, proposta; 008 = Design System do Hub)
 docs/SPRINT2A_ESPECIFICACAO.md  plano técnico da Sprint 2A (catálogo + triagem, sem cálculo)
 docs/HANDOFF.md       estado atual e próxima ação — leia primeiro
 docs/SEGURANCA.md     modelo de ameaças e checklist pré-produção
@@ -48,7 +53,7 @@ Direção de dependência: `apps → packages`. O domínio nunca importa de `app
 ```bash
 npm install                      # na raiz (workspaces)
 npm run verify                   # typecheck + testes + build — obrigatório antes de commit
-npm test                         # vitest (projetos "domain" e "api"); API usa PGlite em memória
+npm test                         # vitest (projetos "domain", "web" e "api"); API usa PGlite em memória
 TEST_DATABASE_URL=postgres://... npm test -- --project api   # contra PostgreSQL real (URL = conexão admin; requer CREATEDB)
 npm run db:check                 # drizzle-kit check: migrações coerentes (também no CI)
 npm run dev                      # API (3333) + web (5173, proxy /api) — PGlite em apps/api/.data
