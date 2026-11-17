@@ -1,6 +1,7 @@
 import { useEffect } from "react";
+import { AppLayout } from "./AppLayout";
 import { AuthProvider, useAuth } from "./auth";
-import { Layout, Loading } from "./components";
+import { AppLinkProvider, EmptyState, Loading, Page, ThemeProvider } from "./ds";
 import { AdminPage } from "./pages/AdminPage";
 import { CompaniesPage } from "./pages/CompaniesPage";
 import { CompanyPage } from "./pages/CompanyPage";
@@ -8,6 +9,9 @@ import { DocumentPage } from "./pages/DocumentPage";
 import { LoginPage } from "./pages/LoginPage";
 import { ReviewDetailPage, ReviewQueuePage } from "./pages/ReviewPage";
 import { matchPath, navigate, RouterProvider, usePath } from "./router";
+
+/** Preferência de aparência é pessoal e deste dispositivo; não depende da organização. */
+export const COLOR_MODE_STORAGE_KEY = "calculadora.color-mode";
 
 function Routes() {
   const { me, loading, hasRole } = useAuth();
@@ -19,8 +23,20 @@ function Routes() {
     if (me && (path === "/login" || path === "/")) navigate("/empresas", true);
   }, [me, loading, path]);
 
-  if (loading) return <Layout><Loading label="Verificando sessão…" /></Layout>;
-  if (!me) return <Layout><LoginPage /></Layout>;
+  if (loading) {
+    return (
+      <div className="cf-boot">
+        <Loading label="Verificando sessão…" />
+      </div>
+    );
+  }
+  if (!me) {
+    return (
+      <AppLinkProvider value={(href) => navigate(href)}>
+        <LoginPage />
+      </AppLinkProvider>
+    );
+  }
 
   let page: React.ReactNode;
   let params: Record<string, string> | null;
@@ -30,17 +46,26 @@ function Routes() {
   else if (path === "/revisao" && hasRole("admin", "fiscal")) page = <ReviewQueuePage />;
   else if ((params = matchPath("/revisao/:id", path)) && hasRole("admin", "fiscal")) page = <ReviewDetailPage id={params.id!} />;
   else if (path === "/admin" && hasRole("admin")) page = <AdminPage />;
-  else page = <div className="empty"><strong>Página não encontrada.</strong></div>;
+  else
+    page = (
+      <Page>
+        <EmptyState icon="alert" title="Página não encontrada">
+          <p>O endereço não existe ou não está disponível para o seu papel.</p>
+        </EmptyState>
+      </Page>
+    );
 
-  return <Layout>{page}</Layout>;
+  return <AppLayout>{page}</AppLayout>;
 }
 
 export default function App() {
   return (
-    <RouterProvider>
-      <AuthProvider>
-        <Routes />
-      </AuthProvider>
-    </RouterProvider>
+    <ThemeProvider className="hub-premium px-root" storageKey={COLOR_MODE_STORAGE_KEY}>
+      <RouterProvider>
+        <AuthProvider>
+          <Routes />
+        </AuthProvider>
+      </RouterProvider>
+    </ThemeProvider>
   );
 }

@@ -1,0 +1,144 @@
+/*
+ * Folha do módulo fiscal da Calculadora (prefixo cf-), carregada depois de
+ * ds/styles em main.tsx. Só padrões que o Design System não tem: área de
+ * importação de XML, totais da NF-e e textos de apoio. Regras (verificadas por
+ * test/design-system-boundaries.test.ts): somente tokens (--color-*, --px-*,
+ * --radius-*), nenhuma cor fixa, nenhuma classe px- redefinida.
+ */
+
+/* Carregamento antes do shell (verificação de sessão) */
+.cf-boot {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+/* Nota permanente do rodapé do conteúdo: nenhum valor é definitivo */
+.cf-footnote {
+  width: min(100%, var(--px-content-max));
+  margin: 0 auto;
+  padding: 8px var(--px-gutter) 32px;
+  color: var(--color-text-subtle);
+  font-size: 0.75rem;
+}
+
+/* Detalhes de validação dentro de um Alert */
+.cf-error-details {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+/* Pilha vertical de avisos e painéis dentro de uma aba ou coluna */
+.cf-stack {
+  display: grid;
+  gap: var(--px-gap);
+}
+.cf-stack > .alert {
+  margin: 0;
+}
+
+/* Botões de ação lado a lado, quebrando no celular */
+.cf-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+/* ------------------------------------------------ Importação de NF-e */
+.cf-upload {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px 20px;
+}
+.cf-upload-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-muted);
+  color: var(--color-primary);
+}
+.cf-upload-text {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+.cf-upload-text p {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+/* Rótulo com aparência de botão; o campo de arquivo continua focável (sr-only). */
+.cf-file {
+  cursor: pointer;
+}
+.cf-file:focus-within {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+.cf-file[aria-disabled='true'] {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+/* ------------------------------------------------ Totais e identificação */
+.cf-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  margin: 0;
+  border-top: 1px solid var(--color-border);
+}
+.cf-metrics div {
+  display: grid;
+  gap: 4px;
+  padding: var(--px-panel-y) var(--px-panel-x);
+  border-right: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+}
+.cf-metrics dt {
+  color: var(--color-text-subtle);
+  font-size: 0.8125rem;
+}
+.cf-metrics dd {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 550;
+  letter-spacing: -0.02em;
+}
+.cf-metrics .cf-metric-total {
+  background: var(--color-surface-muted);
+}
+.cf-metrics .cf-metric-total dd {
+  color: var(--color-primary);
+}
+
+/* Chave de acesso e hash: quebra em qualquer ponto, números tabulares */
+.cf-code {
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8125rem;
+}
+
+.cf-warnings {
+  margin: 0;
+  padding: var(--px-panel-y) var(--px-panel-x) var(--px-panel-y) calc(var(--px-panel-x) + 18px);
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  line-height: 1.7;
+}
+
+/* Lista de detalhes com dt mais largo (rótulos fiscais longos) */
+.cf-dl-wide div {
+  grid-template-columns: 168px minmax(0, 1fr);
+  padding-block: 10px;
+}
+@container px-main (max-width: 560px) {
+  .cf-dl-wide div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+}

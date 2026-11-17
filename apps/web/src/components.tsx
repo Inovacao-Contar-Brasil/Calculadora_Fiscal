@@ -1,82 +1,74 @@
-import { useEffect, useState, type ReactNode } from "react";
+/*
+ * Adaptadores da Calculadora sobre o Design System (src/ds). Não são componentes
+ * de apresentação novos: traduzem dados do produto (erros da API, situações de
+ * classificação e de documento) para os componentes oficiais.
+ */
+import { useEffect, useState } from "react";
 import { ApiError, type ClassificationStatus, type DocumentStatus } from "./api";
-import { useAuth } from "./auth";
-import { Link, navigate, usePath } from "./router";
+import { Alert, ErrorState, Status, type StatusTone } from "./ds";
 
-export function Layout({ children }: { children: ReactNode }) {
-  const { me, logout, hasRole } = useAuth();
-  const path = usePath();
-  const isActive = (prefix: string) => (path === prefix || path.startsWith(prefix + "/") ? "navlink active" : "navlink");
+/** Mensagem segura para exibição a partir de qualquer erro. */
+export function messageOf(error: unknown): string {
+  if (error instanceof ApiError || error instanceof Error) return error.message;
+  return String(error);
+}
+
+function detailsOf(error: unknown): { path?: string; message?: string }[] {
+  return error instanceof ApiError && Array.isArray(error.details) ? (error.details as { path?: string; message?: string }[]) : [];
+}
+
+/** Erro de uma ação (formulário, importação): alerta com os detalhes de validação. */
+export function ApiErrorAlert({ error }: { error: unknown }) {
+  if (!error) return null;
+  const details = detailsOf(error);
   return (
-    <div className="site">
-      <header className="topbar">
-        <div className="brandmark" aria-hidden="true">CB</div>
-        <div className="brand"><strong>Contar Brasil</strong><span>Calculadora Fiscal</span></div>
-        {me && (
-          <nav className="nav" aria-label="Principal">
-            <Link to="/empresas" className={isActive("/empresas")}>Empresas</Link>
-            {hasRole("admin", "fiscal") && <Link to="/revisao" className={isActive("/revisao")}>Revisão fiscal</Link>}
-            {hasRole("admin") && <Link to="/admin" className={isActive("/admin")}>Administração</Link>}
-          </nav>
-        )}
-        {me && (
-          <div className="userbox">
-            <span>{me.user.name}</span>
-            <button type="button" className="linkbutton" onClick={() => void logout().then(() => navigate("/login"))}>Sair</button>
-          </div>
-        )}
-      </header>
-      <main>{children}</main>
-      <footer>Contar Brasil · Fundação SaaS · Nenhum cálculo tributário homologado nesta versão</footer>
-    </div>
+    <Alert tone="danger">
+      {messageOf(error)}
+      {details.length > 0 && (
+        <ul className="cf-error-details">
+          {details.map((detail, index) => (
+            <li key={index}>
+              {detail.path ? detail.path.replace(/^\//, "") + ": " : ""}
+              {detail.message}
+            </li>
+          ))}
+        </ul>
+      )}
+    </Alert>
   );
 }
 
-const CLASSIFICATION_LABEL: Record<ClassificationStatus, string> = {
-  PENDENTE_REVISAO: "Pendente de revisão",
-  EM_ANALISE: "Em análise",
-  HOMOLOGADO: "Homologado",
-  REJEITADO: "Rejeitado",
-};
-
-export function ClassificationBadge({ status }: { status: ClassificationStatus }) {
-  return <span className={"badge " + status.toLowerCase()}>{CLASSIFICATION_LABEL[status]}</span>;
+/** Erro ao carregar uma área: estado de erro do Design System, com nova tentativa. */
+export function LoadError({ error, onRetry, title }: { error: unknown; onRetry?: () => void; title?: string }) {
+  const code = error instanceof ApiError && error.status ? "HTTP " + error.status : undefined;
+  return <ErrorState title={title ?? "Não foi possível carregar"} message={messageOf(error)} code={code} onRetry={onRetry} />;
 }
 
-const DOCUMENT_LABEL: Record<DocumentStatus, string> = {
-  IMPORTADA: "Importada",
-  COM_PENDENCIAS: "Com pendências",
-  REVISADA: "Revisada",
+const CLASSIFICATION: Record<ClassificationStatus, { label: string; tone: StatusTone; outline?: boolean }> = {
+  PENDENTE_REVISAO: { label: "Pendente de revisão", tone: "warning", outline: true },
+  EM_ANALISE: { label: "Em análise", tone: "info" },
+  HOMOLOGADO: { label: "Homologado", tone: "success" },
+  REJEITADO: { label: "Rejeitado", tone: "danger" },
+};
+
+export const CLASSIFICATION_STATUSES = Object.keys(CLASSIFICATION) as ClassificationStatus[];
+export const classificationLabel = (status: ClassificationStatus) => CLASSIFICATION[status].label;
+
+/** Situação de classificação: ponto + texto (a cor nunca é o único sinal). */
+export function ClassificationBadge({ status }: { status: ClassificationStatus }) {
+  const { label, tone, outline } = CLASSIFICATION[status];
+  return <Status tone={tone} outline={outline}>{label}</Status>;
+}
+
+const DOCUMENT: Record<DocumentStatus, { label: string; tone: StatusTone }> = {
+  IMPORTADA: { label: "Importada", tone: "info" },
+  COM_PENDENCIAS: { label: "Com pendências", tone: "warning" },
+  REVISADA: { label: "Revisada", tone: "success" },
 };
 
 export function DocumentBadge({ status }: { status: DocumentStatus }) {
-  return <span className={"badge " + status.toLowerCase()}>{DOCUMENT_LABEL[status]}</span>;
-}
-
-export function ErrorBox({ error }: { error: unknown }) {
-  if (!error) return null;
-  const message = error instanceof ApiError ? error.message : error instanceof Error ? error.message : String(error);
-  const details = error instanceof ApiError && Array.isArray(error.details) ? (error.details as { path?: string; message?: string }[]) : null;
-  return (
-    <div className="error" role="alert">
-      {message}
-      {details && details.length > 0 && (
-        <ul>{details.map((d, index) => <li key={index}>{d.path ? d.path.replace(/^\//, "") + ": " : ""}{d.message}</li>)}</ul>
-      )}
-    </div>
-  );
-}
-
-export function Notice({ children, tone = "info" }: { children: ReactNode; tone?: "info" | "warning" | "success" }) {
-  return <div className={"notice " + tone} role="note">{children}</div>;
-}
-
-export function Loading({ label = "Carregando…" }: { label?: string }) {
-  return <p className="muted">{label}</p>;
-}
-
-export function Empty({ title, children }: { title: string; children?: ReactNode }) {
-  return <div className="empty"><strong>{title}</strong>{children && <p>{children}</p>}</div>;
+  const { label, tone } = DOCUMENT[status];
+  return <Status tone={tone}>{label}</Status>;
 }
 
 /** Hook utilitário para carregar dados com estado de erro/carregamento. */

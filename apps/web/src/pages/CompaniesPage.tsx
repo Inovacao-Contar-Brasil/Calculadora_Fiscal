@@ -1,39 +1,65 @@
 import { api, formatCnpj, type Company } from "../api";
 import { useAuth } from "../auth";
-import { Empty, ErrorBox, Loading, useLoad } from "../components";
-import { Link } from "../router";
+import { LoadError, useLoad } from "../components";
+import { AppLink, EmptyState, Page, PageHeader, PageSkeleton, Panel, Status, Table } from "../ds";
 
 export function CompaniesPage() {
   const { hasRole } = useAuth();
-  const { data, error, loading } = useLoad(() => api<{ companies: Company[] }>("/api/companies"), []);
+  const { data, error, loading, reload } = useLoad(() => api<{ companies: Company[] }>("/api/companies"), []);
+  if (loading) return <PageSkeleton label="Carregando empresas…" />;
+
   return (
-    <>
-      <div className="eyebrow">Empresas</div>
-      <div className="heading">
-        <div>
-          <h1>Suas empresas</h1>
-          <p>Selecione uma empresa para importar NF-e, consultar o histórico e acompanhar o cadastro fiscal mantido pela Contar Brasil.</p>
-        </div>
-      </div>
-      <ErrorBox error={error} />
-      {loading && <Loading />}
-      {data && data.companies.length === 0 && (
-        <Empty title="Nenhuma empresa disponível.">
-          {hasRole("admin", "fiscal") ? <>Cadastre a primeira empresa em <Link to="/admin">Administração</Link>.</> : "Solicite à Contar Brasil a liberação de acesso à sua empresa."}
-        </Empty>
+    <Page>
+      <PageHeader
+        eyebrow="Empresas"
+        title="Suas empresas"
+        subtitle="Selecione uma empresa para importar NF-e, consultar o histórico e acompanhar o cadastro fiscal mantido pela Contar Brasil."
+      />
+      {error ? (
+        <LoadError error={error} onRetry={reload} />
+      ) : data && data.companies.length === 0 ? (
+        <EmptyState icon="building" title="Nenhuma empresa disponível">
+          {hasRole("admin", "fiscal") ? (
+            <p>
+              Cadastre a primeira empresa em <AppLink href="/admin">Administração</AppLink>.
+            </p>
+          ) : (
+            <p>Solicite à Contar Brasil a liberação de acesso à sua empresa.</p>
+          )}
+        </EmptyState>
+      ) : (
+        data && (
+          <Panel title="Empresas" description={<><span className="num">{data.companies.length}</span> disponível(is) para você</>} flush>
+            <Table>
+              <thead>
+                <tr>
+                  <th scope="col">Empresa</th>
+                  <th scope="col">CNPJ</th>
+                  <th scope="col">UF</th>
+                  <th scope="col">Situação</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.companies.map((company) => (
+                  <tr key={company.id}>
+                    <td className="px-cell-title">
+                      <AppLink href={"/empresas/" + company.id} className="px-row-link">
+                        {company.tradeName || company.legalName}
+                      </AppLink>
+                      {company.tradeName && <span className="px-cell-sub">{company.legalName}</span>}
+                    </td>
+                    <td data-label="CNPJ" className="num">{formatCnpj(company.cnpj)}</td>
+                    <td data-label="UF">{company.uf}</td>
+                    <td data-label="Situação">
+                      {company.active ? <Status tone="success">Ativa</Status> : <Status tone="neutral" outline>Inativa</Status>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          </Panel>
+        )
       )}
-      {data && data.companies.length > 0 && (
-        <div className="cardgrid">
-          {data.companies.map((company) => (
-            <Link key={company.id} to={"/empresas/" + company.id} className="card companycard">
-              <strong>{company.tradeName || company.legalName}</strong>
-              {company.tradeName && <span className="muted">{company.legalName}</span>}
-              <span className="muted">{formatCnpj(company.cnpj)} · {company.uf}</span>
-              {!company.active && <span className="badge rejeitado">Inativa</span>}
-            </Link>
-          ))}
-        </div>
-      )}
-    </>
+    </Page>
   );
 }

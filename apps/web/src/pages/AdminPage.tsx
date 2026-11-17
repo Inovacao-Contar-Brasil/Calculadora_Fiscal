@@ -1,36 +1,48 @@
 import { useState, type FormEvent } from "react";
-import { api, formatCnpj, formatDateTime, type Company, type OrgUser } from "../api";
+import { api, formatCnpj, formatDateTime, type Company, type OrgUser, type Role } from "../api";
 import { useAuth } from "../auth";
-import { Empty, ErrorBox, Loading, Notice, useLoad } from "../components";
-import { Link } from "../router";
+import { ApiErrorAlert, LoadError, useLoad } from "../components";
+import { Alert, AppLink, Button, EmptyState, Field, Input, Loading, Page, PageHeader, Panel, PanelGrid, Select, Status, Table } from "../ds";
 
-const UFS = ["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"];
+const UFS = ["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"];
+const ROLE_LABEL: Record<Role, string> = { cliente: "Cliente", fiscal: "Fiscal", admin: "Administrador" };
 
 export function AdminPage() {
   const { me } = useAuth();
   const adminOrgs = (me?.memberships ?? []).filter((m) => m.role === "admin");
   const [orgId, setOrgId] = useState(adminOrgs[0]?.organizationId ?? "");
-  if (!orgId) return <ErrorBox error={new Error("Você não administra nenhuma organização.")} />;
+  if (!orgId) {
+    return (
+      <Page>
+        <EmptyState icon="shield" title="Sem organização para administrar">
+          <p>Você não administra nenhuma organização.</p>
+        </EmptyState>
+      </Page>
+    );
+  }
 
   return (
-    <>
-      <div className="eyebrow">Administração</div>
-      <div className="heading">
-        <div>
-          <h1>Organização</h1>
-          <p>Cadastro de empresas clientes e de usuários. O cadastro fiscal de cada empresa é feito na página da empresa.</p>
-        </div>
-        {adminOrgs.length > 1 && (
-          <select value={orgId} onChange={(e) => setOrgId(e.target.value)}>
-            {adminOrgs.map((m) => <option key={m.organizationId} value={m.organizationId}>{m.organizationName}</option>)}
-          </select>
-        )}
-      </div>
-      <div className="twocol">
+    <Page>
+      <PageHeader
+        eyebrow="Administração"
+        title="Organização"
+        subtitle="Cadastro de empresas clientes e de usuários. O cadastro fiscal de cada empresa é feito na página da empresa."
+        actions={
+          adminOrgs.length > 1 ? (
+            <label className="px-select-inline">
+              <span>Organização</span>
+              <select className="select" value={orgId} onChange={(e) => setOrgId(e.target.value)}>
+                {adminOrgs.map((m) => <option key={m.organizationId} value={m.organizationId}>{m.organizationName}</option>)}
+              </select>
+            </label>
+          ) : undefined
+        }
+      />
+      <PanelGrid>
         <CompaniesAdmin orgId={orgId} />
         <UsersAdmin orgId={orgId} />
-      </div>
-    </>
+      </PanelGrid>
+    </Page>
   );
 }
 
@@ -57,43 +69,57 @@ function CompaniesAdmin({ orgId }: { orgId: string }) {
 
   const companies = (list.data?.companies ?? []).filter((c) => c.organizationId === orgId);
   return (
-    <section>
-      <form className="card form" onSubmit={onSubmit}>
-        <h3>Nova empresa</h3>
-        <div className="formgrid">
-          <label>CNPJ<input value={form.cnpj} onChange={(e) => setForm({ ...form, cnpj: e.target.value })} required placeholder="00.000.000/0000-00" /></label>
-          <label>UF
-            <select value={form.uf} onChange={(e) => setForm({ ...form, uf: e.target.value })}>{UFS.map((uf) => <option key={uf}>{uf}</option>)}</select>
-          </label>
-          <label className="span2">Razão social<input value={form.legalName} onChange={(e) => setForm({ ...form, legalName: e.target.value })} required /></label>
-          <label className="span2">Nome fantasia<input value={form.tradeName} onChange={(e) => setForm({ ...form, tradeName: e.target.value })} /></label>
-        </div>
-        <ErrorBox error={error} />
-        <button type="submit" className="button" disabled={busy}>{busy ? "Salvando…" : "Cadastrar empresa"}</button>
-      </form>
-      <ErrorBox error={list.error} />
-      {list.loading && <Loading />}
-      {!list.loading && companies.length === 0 && <Empty title="Nenhuma empresa cadastrada." />}
-      {companies.length > 0 && (
-        <section className="tablecard">
-          <div className="tablehead"><h3>Empresas ({companies.length})</h3></div>
-          <div className="tablewrap">
-            <table className="compact">
-              <thead><tr><th>Empresa</th><th>CNPJ</th><th>UF</th></tr></thead>
-              <tbody>
-                {companies.map((c) => (
-                  <tr key={c.id}>
-                    <td><Link to={"/empresas/" + c.id}><strong>{c.legalName}</strong></Link>{c.tradeName && <small>{c.tradeName}</small>}</td>
-                    <td>{formatCnpj(c.cnpj)}</td>
-                    <td>{c.uf}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+    <>
+      <Panel title="Empresas" description={<><span className="num">{companies.length}</span> cadastrada(s)</>} span="main" flush>
+        {list.loading ? (
+          <div className="px-form"><Loading label="Carregando empresas…" /></div>
+        ) : list.error ? (
+          <LoadError error={list.error} onRetry={list.reload} />
+        ) : companies.length === 0 ? (
+          <EmptyState icon="building" title="Nenhuma empresa cadastrada" />
+        ) : (
+          <Table>
+            <thead>
+              <tr>
+                <th scope="col">Empresa</th>
+                <th scope="col">CNPJ</th>
+                <th scope="col">UF</th>
+              </tr>
+            </thead>
+            <tbody>
+              {companies.map((c) => (
+                <tr key={c.id}>
+                  <td className="px-cell-title">
+                    <AppLink href={"/empresas/" + c.id} className="px-row-link">{c.legalName}</AppLink>
+                    {c.tradeName && <span className="px-cell-sub">{c.tradeName}</span>}
+                  </td>
+                  <td data-label="CNPJ" className="num">{formatCnpj(c.cnpj)}</td>
+                  <td data-label="UF">{c.uf}</td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        )}
+      </Panel>
+      <Panel title="Nova empresa" span="side" flush>
+        <form className="px-form" onSubmit={onSubmit}>
+          <Field label="CNPJ">{(p) => <Input {...p} value={form.cnpj} onChange={(e) => setForm({ ...form, cnpj: e.target.value })} required placeholder="00.000.000/0000-00" inputMode="numeric" />}</Field>
+          <Field label="UF">
+            {(p) => (
+              <Select {...p} value={form.uf} onChange={(e) => setForm({ ...form, uf: e.target.value })}>
+                {UFS.map((uf) => <option key={uf}>{uf}</option>)}
+              </Select>
+            )}
+          </Field>
+          <Field label="Razão social">{(p) => <Input {...p} value={form.legalName} onChange={(e) => setForm({ ...form, legalName: e.target.value })} required />}</Field>
+          <Field label="Nome fantasia">{(p) => <Input {...p} value={form.tradeName} onChange={(e) => setForm({ ...form, tradeName: e.target.value })} />}</Field>
+          <ApiErrorAlert error={error} />
+          <div className="px-form-actions">
+            <Button type="submit" disabled={busy}>{busy ? "Salvando…" : "Cadastrar empresa"}</Button>
           </div>
-        </section>
-      )}
-    </section>
+        </form>
+      </Panel>
+    </>
   );
 }
 
@@ -119,42 +145,58 @@ function UsersAdmin({ orgId }: { orgId: string }) {
   }
 
   return (
-    <section>
-      <form className="card form" onSubmit={onSubmit} autoComplete="off">
-        <h3>Novo usuário</h3>
-        <div className="formgrid">
-          <label className="span2">Nome<input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required /></label>
-          <label className="span2">E-mail<input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required autoComplete="off" /></label>
-          <label>Senha inicial<input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required minLength={12} autoComplete="new-password" /></label>
-          <label>Papel
-            <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
-              <option value="cliente">Cliente</option>
-              <option value="fiscal">Fiscal</option>
-              <option value="admin">Administrador</option>
-            </select>
-          </label>
-        </div>
-        <Notice>Mínimo de 12 caracteres. Entregue a senha por canal seguro e peça a troca no primeiro acesso. Clientes precisam de liberação por empresa (aba Acessos).</Notice>
-        <ErrorBox error={error} />
-        <button type="submit" className="button" disabled={busy}>{busy ? "Salvando…" : "Criar usuário"}</button>
-      </form>
-      <ErrorBox error={list.error} />
-      {list.loading && <Loading />}
-      {list.data && (
-        <section className="tablecard">
-          <div className="tablehead"><h3>Usuários ({list.data.users.length})</h3></div>
-          <div className="tablewrap">
-            <table className="compact">
-              <thead><tr><th>Nome</th><th>E-mail</th><th>Papel</th><th>Último acesso</th></tr></thead>
+    <>
+      <Panel title="Usuários" description={<><span className="num">{list.data?.users.length ?? 0}</span> na organização</>} span="main" flush>
+        {list.loading ? (
+          <div className="px-form"><Loading label="Carregando usuários…" /></div>
+        ) : list.error ? (
+          <LoadError error={list.error} onRetry={list.reload} />
+        ) : (
+          list.data && (
+            <Table>
+              <thead>
+                <tr>
+                  <th scope="col">Nome</th>
+                  <th scope="col">Papel</th>
+                  <th scope="col">Situação</th>
+                  <th scope="col">Último acesso</th>
+                </tr>
+              </thead>
               <tbody>
                 {list.data.users.map((u) => (
-                  <tr key={u.id}><td>{u.name}</td><td>{u.email}</td><td>{u.role}</td><td>{formatDateTime(u.lastLoginAt)}</td></tr>
+                  <tr key={u.id}>
+                    <td className="px-cell-title"><strong>{u.name}</strong><span className="px-cell-sub">{u.email}</span></td>
+                    <td data-label="Papel">{ROLE_LABEL[u.role] ?? u.role}</td>
+                    <td data-label="Situação">{u.active ? <Status tone="success">Ativo</Status> : <Status tone="neutral" outline>Inativo</Status>}</td>
+                    <td data-label="Último acesso" className="num">{formatDateTime(u.lastLoginAt)}</td>
+                  </tr>
                 ))}
               </tbody>
-            </table>
+            </Table>
+          )
+        )}
+      </Panel>
+      <Panel title="Novo usuário" span="side" flush>
+        <form className="px-form" onSubmit={onSubmit} autoComplete="off">
+          <Field label="Nome">{(p) => <Input {...p} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />}</Field>
+          <Field label="E-mail">{(p) => <Input {...p} type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required autoComplete="off" />}</Field>
+          <Field label="Senha inicial" hint="Mínimo de 12 caracteres">{(p) => <Input {...p} type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required minLength={12} autoComplete="new-password" />}</Field>
+          <Field label="Papel">
+            {(p) => (
+              <Select {...p} value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
+                <option value="cliente">Cliente</option>
+                <option value="fiscal">Fiscal</option>
+                <option value="admin">Administrador</option>
+              </Select>
+            )}
+          </Field>
+          <Alert tone="info">Entregue a senha por canal seguro e peça a troca no primeiro acesso. Clientes precisam de liberação por empresa (aba Acessos).</Alert>
+          <ApiErrorAlert error={error} />
+          <div className="px-form-actions">
+            <Button type="submit" disabled={busy}>{busy ? "Salvando…" : "Criar usuário"}</Button>
           </div>
-        </section>
-      )}
-    </section>
+        </form>
+      </Panel>
+    </>
   );
 }

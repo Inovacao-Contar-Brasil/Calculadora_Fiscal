@@ -1,9 +1,24 @@
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import { api, formatDate, formatDateTime, money, type ClassificationStatus, type Company, type ReviewItem } from "../api";
-import { ClassificationBadge, Empty, ErrorBox, Loading, Notice, useLoad } from "../components";
-import { Link, navigate } from "../router";
-
-const STATUSES: ClassificationStatus[] = ["PENDENTE_REVISAO", "EM_ANALISE", "HOMOLOGADO", "REJEITADO"];
+import { ApiErrorAlert, CLASSIFICATION_STATUSES, ClassificationBadge, LoadError, classificationLabel, useLoad } from "../components";
+import {
+  Alert,
+  AppLink,
+  Button,
+  EmptyState,
+  Field,
+  Input,
+  Loading,
+  Page,
+  PageHeader,
+  PageSkeleton,
+  Panel,
+  PanelGrid,
+  Status,
+  Table,
+  Textarea,
+} from "../ds";
+import { navigate } from "../router";
 
 export function ReviewQueuePage() {
   const params = new URLSearchParams(window.location.search);
@@ -16,53 +31,69 @@ export function ReviewQueuePage() {
   const list = useLoad(() => api<{ items: ReviewItem[] }>("/api/review-items?" + query.toString()), [companyId, status]);
 
   return (
-    <>
-      <div className="eyebrow">Revisão fiscal</div>
-      <div className="heading">
-        <div>
-          <h1>Produtos para classificação</h1>
-          <p>Cada produto novo importado pelos clientes entra aqui como pendente. A homologação registra o enquadramento e o fundamento legal; nenhum valor é calculado nesta etapa.</p>
+    <Page>
+      <PageHeader
+        eyebrow="Revisão fiscal"
+        title="Produtos para classificação"
+        subtitle="Cada produto novo importado pelos clientes entra aqui como pendente. A homologação registra o enquadramento e o fundamento legal; nenhum valor é calculado nesta etapa."
+      />
+      <div className="px-toolbar" role="group" aria-label="Filtros">
+        <div className="px-toolbar-selects">
+          <label className="px-select-inline">
+            <span>Empresa</span>
+            <select className="select" value={companyId} onChange={(e) => setCompanyId(e.target.value)}>
+              <option value="">Todas</option>
+              {(companies.data?.companies ?? []).map((c) => <option key={c.id} value={c.id}>{c.legalName}</option>)}
+            </select>
+          </label>
+          <label className="px-select-inline">
+            <span>Situação</span>
+            <select className="select" value={status} onChange={(e) => setStatus(e.target.value as ClassificationStatus | "")}>
+              <option value="">Todas (vigentes)</option>
+              {CLASSIFICATION_STATUSES.map((s) => <option key={s} value={s}>{classificationLabel(s)}</option>)}
+            </select>
+          </label>
         </div>
       </div>
-      <div className="filters">
-        <label>Empresa
-          <select value={companyId} onChange={(e) => setCompanyId(e.target.value)}>
-            <option value="">Todas</option>
-            {(companies.data?.companies ?? []).map((c) => <option key={c.id} value={c.id}>{c.legalName}</option>)}
-          </select>
-        </label>
-        <label>Situação
-          <select value={status} onChange={(e) => setStatus(e.target.value as ClassificationStatus | "")}>
-            <option value="">Todas (vigentes)</option>
-            {STATUSES.map((s) => <option key={s} value={s}>{s.replace("_", " ")}</option>)}
-          </select>
-        </label>
-      </div>
-      <ErrorBox error={list.error} />
-      {list.loading && <Loading />}
-      {list.data && list.data.items.length === 0 && <Empty title="Nenhum produto nesta situação." />}
-      {list.data && list.data.items.length > 0 && (
-        <section className="tablecard">
-          <div className="tablewrap">
-            <table className="compact">
-              <thead><tr><th>Produto</th><th>NCM / CEST</th><th>Empresa</th><th>Ocorrências</th><th>Situação</th><th>Atualizado</th></tr></thead>
-              <tbody>
-                {list.data.items.map((item) => (
-                  <tr key={item.id} className="clickable" onClick={() => navigate("/revisao/" + item.id)}>
-                    <td><strong>{item.description}</strong></td>
-                    <td>{item.ncm}<small>CEST {item.cest || "não informado"}</small></td>
-                    <td>{item.companyName}</td>
-                    <td>{item.occurrences}</td>
-                    <td><ClassificationBadge status={item.status} /></td>
-                    <td>{formatDateTime(item.updatedAt)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
+      {list.loading ? (
+        <Loading label="Carregando fila…" />
+      ) : list.error ? (
+        <LoadError error={list.error} onRetry={list.reload} />
+      ) : !list.data || list.data.items.length === 0 ? (
+        <EmptyState icon="inbox" title="Nenhum produto nesta situação">
+          <p>Altere os filtros para ver outras situações ou empresas.</p>
+        </EmptyState>
+      ) : (
+        <Panel title="Fila de revisão" description={<><span className="num">{list.data.items.length}</span> produto(s)</>} flush>
+          <Table>
+            <thead>
+              <tr>
+                <th scope="col">Produto</th>
+                <th scope="col">NCM / CEST</th>
+                <th scope="col">Empresa</th>
+                <th scope="col">Ocorrências</th>
+                <th scope="col">Situação</th>
+                <th scope="col">Atualizado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {list.data.items.map((item) => (
+                <tr key={item.id}>
+                  <td className="px-cell-title">
+                    <AppLink href={"/revisao/" + item.id} className="px-row-link">{item.description}</AppLink>
+                  </td>
+                  <td data-label="NCM / CEST" className="num">{item.ncm}<span className="px-cell-sub">CEST {item.cest || "não informado"}</span></td>
+                  <td data-label="Empresa">{item.companyName}</td>
+                  <td data-label="Ocorrências" className="num">{item.occurrences}</td>
+                  <td data-label="Situação"><ClassificationBadge status={item.status} /></td>
+                  <td data-label="Atualizado" className="num">{formatDateTime(item.updatedAt)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        </Panel>
       )}
-    </>
+    </Page>
   );
 }
 
@@ -73,15 +104,17 @@ interface ReviewDetail {
   history: ReviewItem[];
 }
 
+type Mode = "none" | "homologar" | "rejeitar" | "reabrir";
+
 export function ReviewDetailPage({ id }: { id: string }) {
   const { data, error, loading, reload } = useLoad(() => api<ReviewDetail>("/api/review-items/" + id), [id]);
-  const [mode, setMode] = useState<"none" | "homologar" | "rejeitar" | "reabrir">("none");
+  const [mode, setMode] = useState<Mode>("none");
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<unknown>(null);
   const [form, setForm] = useState({ enquadramento: "", fundamentoLegal: "", observacoes: "", justification: "", validFrom: new Date().toISOString().slice(0, 10), validTo: "", reason: "" });
 
-  if (loading) return <Loading />;
-  if (error || !data) return <ErrorBox error={error ?? new Error("Item não encontrado.")} />;
+  if (loading) return <PageSkeleton label="Carregando produto…" />;
+  if (error || !data) return <Page><LoadError error={error ?? new Error("Item não encontrado.")} onRetry={reload} /></Page>;
   const { item, company, occurrences, history } = data;
   const open = item.validTo === null;
   const final = item.status === "HOMOLOGADO" || item.status === "REJEITADO";
@@ -100,6 +133,7 @@ export function ReviewDetailPage({ id }: { id: string }) {
     }
   }
   const patch = (body: Record<string, unknown>) => api("/api/review-items/" + item.id, { method: "PATCH", body });
+  const set = (key: keyof typeof form) => (event: { target: { value: string } }) => setForm({ ...form, [key]: event.target.value });
 
   function onHomologar(event: FormEvent) {
     event.preventDefault();
@@ -117,110 +151,136 @@ export function ReviewDetailPage({ id }: { id: string }) {
     });
   }
 
+  const cancel = <Button variant="ghost" onClick={() => setMode("none")}>Cancelar</Button>;
+
   return (
-    <>
-      <div className="eyebrow"><Link to="/revisao">Revisão fiscal</Link> / {company.legalName}</div>
-      <div className="heading">
-        <div>
-          <h1>{item.description}</h1>
-          <p>NCM {item.ncm} · CEST {item.cest || "não informado"} · {item.occurrences} ocorrência(s) · <Link to={"/empresas/" + company.id}>{company.legalName}</Link></p>
-        </div>
-        <div className="statusgroup">
+    <Page>
+      <PageHeader
+        eyebrow={<><AppLink href="/revisao">Revisão fiscal</AppLink> / {company.legalName}</>}
+        title={item.description}
+        subtitle={<>NCM <span className="num">{item.ncm}</span> · CEST {item.cest || "não informado"} · <span className="num">{item.occurrences}</span> ocorrência(s) · <AppLink href={"/empresas/" + company.id}>{company.legalName}</AppLink></>}
+        actions={open && !final ? <Button onClick={() => setMode("homologar")}>Homologar enquadramento</Button> : undefined}
+      >
+        <div className="px-detail-meta">
           <ClassificationBadge status={item.status} />
-          {!open && <span className="badge rejeitado">Encerrado em {formatDate(item.validTo)}</span>}
+          {!open && <Status tone="neutral" outline>Encerrado em {formatDate(item.validTo)}</Status>}
         </div>
-      </div>
+      </PageHeader>
 
-      {item.decision && (
-        <div className="card decision">
-          <div className="section-label">Decisão registrada</div>
-          <p><strong>Enquadramento:</strong> {item.decision.enquadramento}</p>
-          <p><strong>Fundamento legal:</strong> {item.decision.fundamentoLegal}</p>
-          {item.decision.observacoes && <p><strong>Observações:</strong> {item.decision.observacoes}</p>}
-          <p className="muted">Vigência {formatDate(item.validFrom)} → {item.validTo ? formatDate(item.validTo) : "em aberto"} · decidido em {formatDateTime(item.decidedAt)}</p>
-        </div>
-      )}
-      {item.justification && <Notice><strong>Justificativa:</strong> {item.justification}</Notice>}
-
-      {open && (
-        <div className="actions">
-          {!final && item.status !== "EM_ANALISE" && <button type="button" className="button secondary" disabled={busy} onClick={() => void run(() => patch({ status: "EM_ANALISE" }))}>Assumir análise</button>}
-          {!final && <button type="button" className="button" onClick={() => setMode("homologar")}>Homologar enquadramento</button>}
-          {!final && <button type="button" className="button danger" onClick={() => setMode("rejeitar")}>Rejeitar</button>}
-          {final && <button type="button" className="button secondary" onClick={() => setMode("reabrir")}>Encerrar vigência e reabrir</button>}
-        </div>
-      )}
-      <ErrorBox error={actionError} />
-
-      {mode === "homologar" && (
-        <form className="card form" onSubmit={onHomologar}>
-          <h3>Homologar enquadramento</h3>
-          <p className="muted">Registra apenas a classificação e o fundamento. Alíquotas, MVA e fórmulas entram no catálogo de regras após homologação formal (Issue #3).</p>
-          <div className="formgrid">
-            <label className="span2">Enquadramento<input value={form.enquadramento} onChange={(e) => setForm({ ...form, enquadramento: e.target.value })} required placeholder="Ex.: ICMS-ST — autopeças (Protocolo/Convênio a referenciar)" /></label>
-            <label className="span2">Fundamento legal<textarea rows={2} value={form.fundamentoLegal} onChange={(e) => setForm({ ...form, fundamentoLegal: e.target.value })} required placeholder="Norma, artigo/anexo e link oficial" /></label>
-            <label>Vigência a partir de<input type="date" value={form.validFrom} onChange={(e) => setForm({ ...form, validFrom: e.target.value })} required /></label>
-            <label className="span2">Observações<textarea rows={2} value={form.observacoes} onChange={(e) => setForm({ ...form, observacoes: e.target.value })} /></label>
-            <label className="span2">Justificativa<textarea rows={2} value={form.justification} onChange={(e) => setForm({ ...form, justification: e.target.value })} required /></label>
+      <div className="cf-stack">
+        {open && (
+          <div className="cf-actions" role="group" aria-label="Ações da revisão">
+            {!final && item.status !== "EM_ANALISE" && <Button variant="secondary" disabled={busy} onClick={() => void run(() => patch({ status: "EM_ANALISE" }))}>Assumir análise</Button>}
+            {!final && <Button variant="danger" onClick={() => setMode("rejeitar")}>Rejeitar</Button>}
+            {final && <Button variant="secondary" onClick={() => setMode("reabrir")}>Encerrar vigência e reabrir</Button>}
           </div>
-          <div className="actions"><button type="submit" className="button" disabled={busy}>Confirmar homologação</button><button type="button" className="button secondary" onClick={() => setMode("none")}>Cancelar</button></div>
-        </form>
-      )}
-      {mode === "rejeitar" && (
-        <form className="card form" onSubmit={onRejeitar}>
-          <h3>Rejeitar</h3>
-          <label>Justificativa<textarea rows={3} value={form.justification} onChange={(e) => setForm({ ...form, justification: e.target.value })} required /></label>
-          <div className="actions"><button type="submit" className="button danger" disabled={busy}>Confirmar rejeição</button><button type="button" className="button secondary" onClick={() => setMode("none")}>Cancelar</button></div>
-        </form>
-      )}
-      {mode === "reabrir" && (
-        <form className="card form" onSubmit={onReabrir}>
-          <h3>Encerrar vigência e reabrir</h3>
-          <p className="muted">Use quando a legislação mudar. A decisão atual é preservada até a data informada; notas emitidas depois voltam a pendente.</p>
-          <div className="formgrid">
-            <label>Fim da vigência<input type="date" value={form.validTo} onChange={(e) => setForm({ ...form, validTo: e.target.value })} required /></label>
-            <label className="span2">Motivo<textarea rows={2} value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} required /></label>
-          </div>
-          <div className="actions"><button type="submit" className="button" disabled={busy}>Confirmar</button><button type="button" className="button secondary" onClick={() => setMode("none")}>Cancelar</button></div>
-        </form>
-      )}
+        )}
+        <ApiErrorAlert error={actionError} />
 
-      <section className="tablecard">
-        <div className="tablehead"><h3>Ocorrências em NF-e</h3><p>Últimas {occurrences.length} ocorrência(s) deste produto na empresa</p></div>
-        <div className="tablewrap">
-          <table className="compact">
-            <thead><tr><th>NF-e</th><th>Emissão</th><th>Emitente</th><th>Item</th><th>Valor produto</th><th>Classificação</th></tr></thead>
-            <tbody>
-              {occurrences.map((o) => (
-                <tr key={o.documentId + "-" + o.line} className="clickable" onClick={() => navigate("/documentos/" + o.documentId)}>
-                  <td>nº {o.number}</td><td>{formatDate(o.issuedAt)}</td><td>{o.issuerName}</td><td>{o.line}</td><td>{money(o.productCents)}</td><td><ClassificationBadge status={o.classificationStatus} /></td>
+        {mode === "homologar" && (
+          <DecisionForm title="Homologar enquadramento" description="Registra apenas a classificação e o fundamento. Alíquotas, MVA e fórmulas entram no catálogo de regras após homologação formal (Issue #3)." onSubmit={onHomologar} actions={<>{cancel}<Button type="submit" disabled={busy}>Confirmar homologação</Button></>}>
+            <Field label="Enquadramento">{(p) => <Input {...p} value={form.enquadramento} onChange={set("enquadramento")} required placeholder="Ex.: ICMS-ST — autopeças (Protocolo/Convênio a referenciar)" />}</Field>
+            <Field label="Fundamento legal" hint="Norma, artigo/anexo e link oficial">{(p) => <Textarea {...p} rows={2} value={form.fundamentoLegal} onChange={set("fundamentoLegal")} required />}</Field>
+            <div className="px-form-row">
+              <Field label="Vigência a partir de">{(p) => <Input {...p} type="date" value={form.validFrom} onChange={set("validFrom")} required />}</Field>
+            </div>
+            <Field label="Observações">{(p) => <Textarea {...p} rows={2} value={form.observacoes} onChange={set("observacoes")} />}</Field>
+            <Field label="Justificativa">{(p) => <Textarea {...p} rows={2} value={form.justification} onChange={set("justification")} required />}</Field>
+          </DecisionForm>
+        )}
+        {mode === "rejeitar" && (
+          <DecisionForm title="Rejeitar" onSubmit={onRejeitar} actions={<>{cancel}<Button type="submit" variant="danger" disabled={busy}>Confirmar rejeição</Button></>}>
+            <Field label="Justificativa">{(p) => <Textarea {...p} rows={3} value={form.justification} onChange={set("justification")} required />}</Field>
+          </DecisionForm>
+        )}
+        {mode === "reabrir" && (
+          <DecisionForm title="Encerrar vigência e reabrir" description="Use quando a legislação mudar. A decisão atual é preservada até a data informada; notas emitidas depois voltam a pendente." onSubmit={onReabrir} actions={<>{cancel}<Button type="submit" disabled={busy}>Confirmar</Button></>}>
+            <div className="px-form-row">
+              <Field label="Fim da vigência">{(p) => <Input {...p} type="date" value={form.validTo} onChange={set("validTo")} required />}</Field>
+            </div>
+            <Field label="Motivo">{(p) => <Textarea {...p} rows={2} value={form.reason} onChange={set("reason")} required />}</Field>
+          </DecisionForm>
+        )}
+
+        <PanelGrid>
+          <Panel title="Decisão registrada" span="side" flush>
+            {item.decision || item.justification ? (
+              <dl className="px-dl cf-dl-wide">
+                {item.decision?.enquadramento && <div><dt>Enquadramento</dt><dd>{item.decision.enquadramento}</dd></div>}
+                {item.decision?.fundamentoLegal && <div><dt>Fundamento legal</dt><dd>{item.decision.fundamentoLegal}</dd></div>}
+                {item.decision?.observacoes && <div><dt>Observações</dt><dd>{item.decision.observacoes}</dd></div>}
+                {item.justification && <div><dt>Justificativa</dt><dd>{item.justification}</dd></div>}
+                {item.decision && <div><dt>Vigência</dt><dd className="num">{formatDate(item.validFrom)} → {item.validTo ? formatDate(item.validTo) : "em aberto"}</dd></div>}
+                {item.decidedAt && <div><dt>Decidido em</dt><dd className="num">{formatDateTime(item.decidedAt)}</dd></div>}
+              </dl>
+            ) : (
+              <p className="px-aside-note">Nenhuma decisão registrada para este produto.</p>
+            )}
+          </Panel>
+          <Panel title="Ocorrências em NF-e" description={<>Últimas <span className="num">{occurrences.length}</span> ocorrência(s) deste produto na empresa</>} span="main" flush>
+            <Table>
+              <thead>
+                <tr>
+                  <th scope="col">NF-e</th>
+                  <th scope="col">Emissão</th>
+                  <th scope="col">Emitente</th>
+                  <th scope="col">Item</th>
+                  <th scope="col">Valor produto</th>
+                  <th scope="col">Classificação</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      {history.length > 0 && (
-        <section className="tablecard">
-          <div className="tablehead"><h3>Outras decisões para este produto</h3></div>
-          <div className="tablewrap">
-            <table className="compact">
-              <thead><tr><th>Situação</th><th>Vigência</th><th>Enquadramento</th><th>Registrado</th></tr></thead>
+              </thead>
               <tbody>
-                {history.map((h) => (
-                  <tr key={h.id} className="clickable" onClick={() => navigate("/revisao/" + h.id)}>
-                    <td><ClassificationBadge status={h.status} /></td>
-                    <td>{h.validFrom ? formatDate(h.validFrom) : "—"} → {h.validTo ? formatDate(h.validTo) : "em aberto"}</td>
-                    <td>{h.decision?.enquadramento ?? "—"}</td>
-                    <td>{formatDateTime(h.createdAt)}</td>
+                {occurrences.map((o) => (
+                  <tr key={o.documentId + "-" + o.line}>
+                    <td className="px-cell-title"><AppLink href={"/documentos/" + o.documentId} className="px-row-link">nº {o.number}</AppLink></td>
+                    <td data-label="Emissão" className="num">{formatDate(o.issuedAt)}</td>
+                    <td data-label="Emitente">{o.issuerName}</td>
+                    <td data-label="Item" className="num">{o.line}</td>
+                    <td data-label="Valor produto" className="num">{money(o.productCents)}</td>
+                    <td data-label="Classificação"><ClassificationBadge status={o.classificationStatus} /></td>
                   </tr>
                 ))}
               </tbody>
-            </table>
-          </div>
-        </section>
-      )}
-    </>
+            </Table>
+          </Panel>
+          {history.length > 0 && (
+            <Panel title="Outras decisões para este produto" span="full" flush>
+              <Table>
+                <thead>
+                  <tr>
+                    <th scope="col">Enquadramento</th>
+                    <th scope="col">Situação</th>
+                    <th scope="col">Vigência</th>
+                    <th scope="col">Registrado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {history.map((h) => (
+                    <tr key={h.id}>
+                      <td className="px-cell-title"><AppLink href={"/revisao/" + h.id} className="px-row-link">{h.decision?.enquadramento ?? "Sem enquadramento"}</AppLink></td>
+                      <td data-label="Situação"><ClassificationBadge status={h.status} /></td>
+                      <td data-label="Vigência" className="num">{h.validFrom ? formatDate(h.validFrom) : "—"} → {h.validTo ? formatDate(h.validTo) : "em aberto"}</td>
+                      <td data-label="Registrado" className="num">{formatDateTime(h.createdAt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
+            </Panel>
+          )}
+        </PanelGrid>
+        {!open && <Alert tone="info">Esta decisão foi encerrada. As notas emitidas depois do fim da vigência estão no item reaberto, listado em "Outras decisões".</Alert>}
+      </div>
+    </Page>
+  );
+}
+
+function DecisionForm({ title, description, onSubmit, actions, children }: { title: string; description?: string; onSubmit: (event: FormEvent) => void; actions: ReactNode; children: ReactNode }) {
+  return (
+    <Panel title={title} description={description} flush>
+      <form className="px-form" onSubmit={onSubmit}>
+        {children}
+        <div className="px-form-actions">{actions}</div>
+      </form>
+    </Panel>
   );
 }

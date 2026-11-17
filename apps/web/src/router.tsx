@@ -1,6 +1,10 @@
-import { createContext, useContext, useEffect, useState, type MouseEvent, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 
-/** Roteador mínimo sobre a History API; evita dependência extra nesta fase. */
+/**
+ * Roteador mínimo sobre a History API; evita dependência extra nesta fase.
+ * Links usam `AppLink` do Design System; `App`/`AppLayout` entregam `navigate`
+ * ao `AppLinkProvider`, então nenhum componente do DS conhece este roteador.
+ */
 
 const RouteContext = createContext<string>("/");
 
@@ -41,17 +45,4 @@ export function matchPath(pattern: string, path: string): Record<string, string>
     else if (expected !== actual) return null;
   }
   return params;
-}
-
-export function Link({ to, children, className }: { to: string; children: ReactNode; className?: string }) {
-  const onClick = (event: MouseEvent<HTMLAnchorElement>) => {
-    if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
-    event.preventDefault();
-    navigate(to);
-  };
-  return (
-    <a href={to} className={className} onClick={onClick}>
-      {children}
-    </a>
-  );
 }
