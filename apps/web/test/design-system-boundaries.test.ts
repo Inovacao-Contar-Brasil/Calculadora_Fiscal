@@ -13,7 +13,8 @@ const read = (file: string) => readFileSync(path.join(src, file), "utf8");
 
 function walk(dir: string): string[] {
   return readdirSync(path.join(src, dir)).flatMap((name) => {
-    const rel = path.join(dir, name);
+    // Normalizar caminhos relativos como POSIX; a leitura em disco continua via path.join.
+    const rel = path.posix.join(dir, name);
     return statSync(path.join(src, rel)).isDirectory() ? walk(rel) : [rel];
   });
 }
@@ -36,7 +37,7 @@ describe("Design System (src/ds) é só apresentação", () => {
           expect(spec === "react" || spec.startsWith("@fontsource-variable/inter"), `${file} → ${spec}`).toBe(true);
           continue;
         }
-        const target = path.normalize(path.join(path.dirname(file), spec));
+        const target = path.posix.normalize(path.posix.join(path.posix.dirname(file), spec));
         expect(target.startsWith("ds") || target.startsWith("theme") || target === "styles/global.css", `${file} → ${spec}`).toBe(true);
       }
     }
@@ -85,7 +86,7 @@ describe("Aplicação usa o Design System pela API pública", () => {
   it("telas importam do DS somente por ds/index (e ds/styles uma vez, na entrada)", () => {
     for (const file of appFiles) {
       for (const spec of importsOf(file)) {
-        const target = path.normalize(path.join(path.dirname(file), spec));
+        const target = path.posix.normalize(path.posix.join(path.posix.dirname(file), spec));
         if (target.startsWith("theme")) throw new Error(`${file} importa o tema diretamente: ${spec}`);
         if (!target.startsWith("ds")) continue;
         const allowed = target === "ds" || (file === "main.tsx" && target === "ds/styles");
