@@ -7,6 +7,7 @@ import { CompanyPage } from "./pages/CompanyPage";
 import { DocumentPage } from "./pages/DocumentPage";
 import { LoginPage } from "./pages/LoginPage";
 import { ReviewDetailPage, ReviewQueuePage } from "./pages/ReviewPage";
+import { CatalogPage, RuleDetailPage, SourceDetailPage, VersionDetailPage } from "./pages/CatalogPage";
 import { matchPath, navigate, RouterProvider, usePath } from "./router";
 
 function Routes() {
@@ -29,6 +30,10 @@ function Routes() {
   else if ((params = matchPath("/documentos/:id", path))) page = <DocumentPage id={params.id!} />;
   else if (path === "/revisao" && hasRole("admin", "fiscal")) page = <ReviewQueuePage />;
   else if ((params = matchPath("/revisao/:id", path)) && hasRole("admin", "fiscal")) page = <ReviewDetailPage id={params.id!} />;
+  else if (path === "/catalogo" && hasRole("admin", "fiscal")) page = <CatalogPage />;
+  else if ((params = matchPath("/catalogo/fontes/:id", path)) && hasRole("admin", "fiscal")) page = <SourceDetailPage id={params.id!} />;
+  else if ((params = matchPath("/catalogo/regras/:id", path)) && hasRole("admin", "fiscal")) page = <RuleDetailPage id={params.id!} />;
+  else if ((params = matchPath("/catalogo/versoes/:id", path)) && hasRole("admin", "fiscal")) page = <VersionDetailPage id={params.id!} />;
   else if (path === "/admin" && hasRole("admin")) page = <AdminPage />;
   else page = <div className="empty"><strong>Página não encontrada.</strong></div>;
 
