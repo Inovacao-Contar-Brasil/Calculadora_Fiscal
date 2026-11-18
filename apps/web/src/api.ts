@@ -170,3 +170,104 @@ export interface OrgUser {
   role: Role;
   lastLoginAt: string | null;
 }
+
+// --- Catálogo legal (Sprint 2A.1) ---
+
+export type RuleVersionStatus = "RASCUNHO" | "EM_REVISAO_TECNICA" | "APROVADA" | "ATIVA" | "SUSPENSA" | "SUBSTITUIDA" | "REVOGADA";
+export type RuleOperation = "SUBMETE" | "APROVA" | "DEVOLVE" | "ATIVA" | "SUSPENDE" | "REATIVA" | "REVOGA";
+export type LicenseStatus = "OFICIAL_PUBLICO" | "LICENCIADO_CONFIRMADO" | "LICENCA_NAO_VERIFICADA" | "INTERNO";
+export type ProvisionRole = "FUNDAMENTO" | "EXCECAO" | "CONFRONTO" | "INTERPRETACAO";
+
+export interface LegalSource {
+  id: string;
+  organizationId: string;
+  kind: string;
+  category: "NORMATIVA_OFICIAL" | "FERRAMENTA_CONFRONTO" | "INTERPRETACAO_INTERNA" | "CONTEUDO_LICENCIADO";
+  jurisdiction: "FEDERAL" | "CONFAZ" | "UF";
+  uf: string | null;
+  issuer: string;
+  number: string | null;
+  title: string;
+  publishedAt: string;
+  officialUrl: string | null;
+  normative: boolean;
+  licenseStatus: LicenseStatus;
+  licenseReference: string | null;
+  notes: string | null;
+  createdBy: string;
+  createdAt: string;
+  provisionCount?: number;
+}
+
+export interface LegalSnapshot {
+  id: string;
+  sourceId: string;
+  retrievedAt: string;
+  retrievedBy: string;
+  url: string | null;
+  method: "MANUAL" | "IMPORTACAO_ASSISTIDA";
+  contentSha256: string;
+  storageRef: string | null;
+  notes: string | null;
+}
+
+export interface LegalProvision {
+  id: string;
+  sourceId: string;
+  snapshotId: string;
+  reference: string;
+  heading: string | null;
+  officialText: string | null;
+  publishedAt: string;
+  effectsFrom: string;
+  effectsTo: string | null;
+  effectsClosedAt: string | null;
+  effectsClosedReason: string | null;
+  source?: LegalSource;
+  usedBy?: { versionId: string; version: number; status: RuleVersionStatus; ruleId: string; ruleCode: string; role: ProvisionRole }[];
+}
+
+export interface TaxRule {
+  id: string;
+  organizationId: string;
+  layer: "CLASSIFICACAO" | "INCIDENCIA";
+  kind: string;
+  code: string;
+  title: string;
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface RuleVersionSummary {
+  id: string;
+  ruleId: string;
+  version: number;
+  status: RuleVersionStatus;
+  effectsFrom: string;
+  effectsTo: string | null;
+  effectsEndedOn: string | null;
+  contentSha256: string;
+  changeReason: string;
+  authorId: string;
+  createdAt: string;
+  statusChangedAt: string;
+  supersededByVersionId: string | null;
+}
+
+export interface RuleVersion extends RuleVersionSummary {
+  conditionsSchemaVersion: number;
+  conditions: Record<string, unknown>;
+}
+
+export interface WorkflowEntry {
+  id: string;
+  ruleVersionId: string;
+  version?: number | null;
+  action: RuleOperation | "SUBSTITUI";
+  fromStatus: RuleVersionStatus;
+  toStatus: RuleVersionStatus;
+  decidedBy: string;
+  decidedAt: string;
+  justification: string | null;
+  authorizationReference: string | null;
+}
