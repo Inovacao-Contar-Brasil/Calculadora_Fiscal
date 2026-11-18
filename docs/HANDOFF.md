@@ -2,6 +2,33 @@
 
 > Leia junto com `CLAUDE.md`. Atualize este arquivo após cada marco e antes de encerrar a sessão. Não dependa do histórico de nenhuma conversa: tudo o que importa está aqui, nos commits e nas Issues.
 
+## Atualização 18/11/2026 — Sprint 2A.1 Catálogo legal (implementada, aguardando revisão)
+
+- **Branch:** `feat/sprint2a1-catalogo-legal`, criada a partir de `feat/sprint1-fundacao-segura` @ `70c5c17` (PR #7 **não** integrado à `main`). **PR dependente (stacked)** com base `feat/sprint1-fundacao-segura`; quando o #7 for mergeado, rebasear/retargetar para `main`.
+- **Escopo autorizado pela missão CF-2A1-CATALOGO-LEGAL** (18/11/2026). As decisões de negócio da seção 11 da especificação continuam pendentes; nada aqui as presume.
+- **Issue #8 (achado 2, pendência fora da vigência) continua aberta e é bloqueadora da integração final.** Não foi tocada nesta branch.
+- **Commits:** `e51a9aa` (domínio + migrações 0001/0002 + testes de persistência), `1d3b874` (API, workflow, isolamento, concorrência, guardas), `54de80f` (interface mínima), seguinte (documentação).
+- **O que existe:** fontes normativas com licença, snapshots com SHA-256, dispositivos com publicação ≠ efeitos e encerramento sem apagar; regras `CLASSIFICACAO`/`INCIDENCIA` com versões append-only; condições `RuleConditions` v1 validadas; workflow `RASCUNHO → EM_REVISAO_TECNICA → APROVADA → ATIVA` (+ `SUSPENSA`, `SUBSTITUIDA`, `REVOGADA`) com quatro olhos no backend **e** no banco; trilha e auditoria na mesma transação; 409 em concorrência; UI em `/catalogo`. Documentação do módulo: `docs/CATALOGO_LEGAL.md`. Refinamentos propostos: ADR-007 (seção nova; status segue "proposta").
+- **O que NÃO existe (fora da 2A.1):** cálculo de qualquer tributo, alíquota/MVA/base, importação NCM/CEST (2A.2), finalidade por item (2A.3), motor de triagem (2A.4), SHADOW/EXCECOES (2A.5/2A.7), `legal_amendments` e reprocessamento (2A.6), scraper/Econet, redesign, Hub. **Regras ATIVAS não são aplicadas a NF-e.**
+- **Verificação local (Linux, Node 22.23, npm 10.9, PostgreSQL 16.15):** `npm ci` ok; `npm audit --omit=dev --audit-level=high` 0; `db:check` ok; typecheck 0 erros; `npm test` 126 + 1 só-PostgreSQL em 19 arquivos (antes: 69); `TEST_DATABASE_URL=… npm test -- --project api` 103/103 em 3 execuções seguidas (antes: 57), concorrência 5× seguidas, sem bancos `cf_test_*` remanescentes; build ok. E2E Playwright (scratch, não versionado) com 4 usuários sintéticos: fluxo completo, autor bloqueado (403 `FOUR_EYES`), cliente sem menu e 404/403 na API.
+- **CI:** push de `1d3b874` verde ([44308757035](https://github.com/Inovacao-Contar-Brasil/Calculadora_Fiscal/actions/runs/44308757035)). Conferir o último SHA na aba Actions. Atenção: o workflow só roda `pull_request` para base `main`; PR stacked tem só o CI de push.
+- **Não feito:** `npm.cmd ci`/`verify` no Windows; revisão humana; homologação de qualquer regra real.
+
+### Decisões que exigem Henrique/Iza/Edson (2A.1)
+
+1. Quem aprova regras e quem ativa (hoje: aprova `admin`/`fiscal` ≠ autor; ativa só `admin` ≠ autor, com referência de autorização) e se a ativação exige terceira pessoa (`RULE_ACTIVATION_REQUIRES_THIRD_PERSON`, padrão `false`). Decisão nº 2 da especificação.
+2. Qual registro formal serve de `authorizationReference` na ativação de regra real (ata, e-mail, Issue #3).
+3. Confirmar salvaguardas das condições: incidência sempre com `ufDestino`; classificação por descrição só com aceite explícito; NCM mínimo de 4 dígitos.
+4. Catálogo por escritório (organização) vs. catálogo oficial compartilhado entre organizações.
+5. Licença Econet e bases privadas (decisão nº 4): enquanto não houver contrato registrado, ficam `LICENCA_NAO_VERIFICADA` e bloqueadas.
+6. Guarda de fixtures `OFICIAL_PUBLICO` da especificação (seção 8) conflita com o critério de pronto — validar a substituição por guarda de domínios oficiais/TLD `.invalid`.
+
+### Próxima ação exata
+
+1. Revisão humana do PR da 2A.1 (dependente do #7) e das decisões acima.
+2. Resolver a Issue #8 (achado 2) na fundação; integrar o #7; retargetar este PR para `main`.
+3. Sprint 2A.2: importação curada das tabelas NCM e CEST×NCM com snapshot, hash e vigência, reutilizando `legal_sources`/`legal_source_snapshots` (espécie `ATO_TABELA`) para a proveniência; validação de NCM/CEST por data com proveniência visível. Sem cálculo.
+
 ## Atualização 17/11/2026 — revisão independente, sem Fable
 
 - **Issue #8 parcialmente corrigida diretamente pelo GitHub**, no PR #7 ainda em draft e sem merge:

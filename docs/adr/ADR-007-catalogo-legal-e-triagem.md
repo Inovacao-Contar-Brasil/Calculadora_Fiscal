@@ -32,3 +32,18 @@ A Issue #4 muda o requisito da Sprint 1: a revisão fiscal deve tratar só exce�
 - Mais tabelas e um passo de curadoria antes de qualquer automação — intencional: cobertura só existe quando alguém responsável a aprovou.
 - A fila da Sprint 1 continua sendo o comportamento padrão até o Fiscal habilitar `EXCECOES` com base no modo sombra.
 - A Sprint 2B herda um portão explícito e o catálogo com proveniência, sem precisar refatorar a camada de classificação.
+
+## Refinamentos propostos na implementação da 2A.1 (18/11/2026)
+
+Registrados pela sessão de implementação para revisão humana. **O status desta ADR continua "proposta"**: nada aqui foi aprovado por Henrique, Iza ou Edson. Detalhes em `docs/CATALOGO_LEGAL.md`.
+
+1. **Catálogo por organização, com FKs compostas.** Fontes, snapshots e dispositivos também têm `organization_id` (a especificação só o previa em `tax_rules`); as referências usam FKs `(organization_id, id)`, então o banco impede citação entre organizações. Consequência: a mesma norma oficial é cadastrada por escritório.
+2. **Garantias no banco, não só no backend.** Triggers append-only (sem DELETE; conteúdo imutável), mudança de status só com linha na trilha da mesma transação, vínculos de dispositivo só na criação da versão, CHECK de quatro olhos com autor garantido por FK composta, uma versão ATIVA e uma em revisão por regra.
+3. **Trilha única do workflow.** `tax_rule_approvals` registra toda transição (`SUBMETE`, `APROVA`, `DEVOLVE`, `ATIVA`, `SUSPENDE`, `REATIVA`, `REVOGA`, `SUBSTITUI`) com origem/destino, em vez de só os passos de aprovação.
+4. **Quatro olhos ampliado.** O autor também não devolve, não ativa e não reativa a própria versão. Ativação/suspensão/revogação restritas a `admin` e ativação exige `authorizationReference` (registro externo da autorização de negócio) — **provisório até a decisão nº 2**. Terceira pessoa (ativador ≠ aprovador) disponível por configuração (`RULE_ACTIVATION_REQUIRES_THIRD_PERSON`), desligada por padrão.
+5. **Devolução** volta a versão a `RASCUNHO` sem permitir edição; a correção é uma nova versão, que substitui o rascunho anterior (preservado como `SUBSTITUIDA`).
+6. **Encerramento sem reescrever:** `effects_to` da versão é imutável; substituição/revogação gravam `effects_ended_on`.
+7. **`legal_amendments` adiada para a 2A.6**, com o reprocessamento; na 2A.1 a mudança legal é registrada encerrando os efeitos do dispositivo (que bloqueia versões cujo fundamento deixou de cobrir a vigência).
+8. **Licença:** valor `INTERNO` acrescentado para interpretação do escritório; espécie `BASE_LICENCIADA` acrescentada; licença não verificada bloqueia submissão, aprovação e ativação e impede envio de conteúdo/importação assistida.
+9. **Condições v1:** classificação exige NCM + (CEST ou descrição aceita expressamente); sem critério por CNAE; capítulo de NCM isolado recusado; incidência exige `segmentIn` e `ufDestino` (salvaguarda a confirmar pelo Fiscal).
+10. **Fixtures `OFICIAL_PUBLICO`:** a guarda da seção 8 da especificação que proíbe esse valor em fixtures conflita com o critério de pronto da 2A.1; substituída por guarda de domínios oficiais e TLD `.invalid`.

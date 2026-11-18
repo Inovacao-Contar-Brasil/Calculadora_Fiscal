@@ -17,7 +17,8 @@ Plataforma SaaS da Contar Brasil para consulta tributária por produto a partir 
 7. **Não anuncie como pronto o que não foi testado.** Rode `npm run verify` antes de cada commit.
 8. **Atualize `docs/HANDOFF.md`** após cada marco e antes de encerrar a sessão.
 9. **Classificação de item vem só de `classificationFor`** (`apps/api/src/modules/classification.ts`), na importação e na propagação. Homologação vale só dentro da vigência. Classificação homologada **não** autoriza cálculo (ADR-007).
-10. **Testes nunca apagam nada em banco compartilhado.** Os arquivos de teste rodam em paralelo; com `TEST_DATABASE_URL` cada harness cria e remove o próprio banco `cf_test_*` (`apps/api/src/test/pg-test-database.ts`).
+10. **Catálogo legal é append-only e staff-only.** Conteúdo de versão nunca é editado (nova versão); status só muda com linha em `tax_rule_approvals` na mesma transação (trigger); autor não aprova/devolve/ativa. Nenhuma coluna ou código de alíquota/MVA/base no catálogo (`guards.test.ts`). Ver `docs/CATALOGO_LEGAL.md`.
+11. **Testes nunca apagam nada em banco compartilhado.** Os arquivos de teste rodam em paralelo; com `TEST_DATABASE_URL` cada harness cria e remove o próprio banco `cf_test_*` (`apps/api/src/test/pg-test-database.ts`).
 
 ## Estrutura
 
@@ -27,16 +28,19 @@ packages/domain/      domínio puro (sem framework/banco/UI)
   src/produto/        identidade de produto (fingerprint NCM|CEST|descrição)
   src/cadastro/       validação de CNPJ
   src/tributario/     SOMENTE interfaces do motor tributário
+  src/catalogo/       workflow das versões de regra, tipos RuleConditions v1, JSON canônico (2A.1)
 apps/api/             Fastify 5 + Zod 4 + Drizzle ORM (PostgreSQL / PGlite)
   src/app.ts          montagem do servidor (helmet, cookie, rate limit, CSRF, erros)
   src/auth/           senha (scrypt), sessão (token opaco + SHA-256), autorização
   src/modules/        auth, companies, fiscal-profiles, documents, review (rotas + regras)
+  src/modules/catalog/  catálogo legal 2A.1: fontes, snapshots, dispositivos, regras, versões, workflow (staff-only)
   src/modules/classification.ts  regra única de status do item a partir da decisão
   src/db/schema.ts    esquema; drizzle/ migrações SQL geradas
   src/test/           harness (PGlite em memória ou banco exclusivo via TEST_DATABASE_URL) e fixtures
 apps/web/             React 19 + Vite; SPA autenticada; roteador próprio (src/router.tsx)
 docs/adr/             decisões arquiteturais (ADR-001…007; 007 = catálogo legal e triagem, proposta)
 docs/SPRINT2A_ESPECIFICACAO.md  plano técnico da Sprint 2A (catálogo + triagem, sem cálculo)
+docs/CATALOGO_LEGAL.md          módulo implementado da 2A.1: modelo, workflow, permissões, endpoints
 docs/HANDOFF.md       estado atual e próxima ação — leia primeiro
 docs/SEGURANCA.md     modelo de ameaças e checklist pré-produção
 ```

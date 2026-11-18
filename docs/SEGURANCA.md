@@ -43,6 +43,13 @@ Documento de trabalho da Sprint 1. Complementa as ADRs 002, 003 e 005.
 | Adulteração do XML armazenado | imutável; SHA-256 registrado; download recalcula o hash e recusa divergência (409 `INTEGRITY_FAILURE`, auditado); `X-Content-SHA256`; `contentDiffers` em reimportação | `isolation.test.ts`, `documents.test.ts` |
 | Travessia de caminho no frontend servido | `@fastify/static` ≥ 10.1.11, `wildcard: false`; testes com `..`, `%2e%2e`, `%2f`, `%5c` | `app.test.ts` |
 | Ações sem rastro | `audit_events` na mesma transação (inclusive login, logout e troca de senha) | `fiscal-profiles.test.ts`, `auth.test.ts` |
+| Cliente lê ou altera o catálogo legal (rotas internas por ID) | catálogo staff-only: coleções 403 para cliente, recursos por ID 404 idêntico a inexistente (`staffRoleOrNotFound`) | `isolation.test.ts` (catálogo) |
+| Escritório A cita/lê catálogo do escritório B | organização da URL conferida contra as associações; corpos estritos recusam `organizationId`; FKs compostas `(organization_id, id)` no banco | `isolation.test.ts`, `catalog-schema.test.ts` |
+| Autor aprova/ativa a própria regra | `checkTransition` no backend + CHECK `tax_rule_approvals_four_eyes_ck` com autor garantido por FK composta | `catalog-flow.test.ts`, `catalog-schema.test.ts` |
+| Reescrita ou exclusão de evidência normativa | triggers append-only (migração 0002); conteúdo de versão imutável com SHA-256; status só muda com trilha na mesma transação | `catalog-schema.test.ts` |
+| Aprovação/ativação concorrente | bloqueio da regra (`FOR UPDATE`) + releitura + 409; índices únicos de uma ATIVA por regra e uma APROVA/ATIVA por versão | `catalog-concurrency.test.ts` (PostgreSQL real) |
+| Uso de conteúdo licenciado sem autorização | `license_status`; licença não verificada bloqueia conteúdo, importação assistida, aprovação e ativação; mudança de licença só por admin, auditada | `catalog-flow.test.ts` |
+| Fórmula tributária introduzida antes da 2B | guardas de esquema/código/interfaces | `guards.test.ts` |
 | Dependência vulnerável em produção | CI: `npm audit --omit=dev --audit-level=high` bloqueia | CI |
 
 ## Riscos residuais e pendências
@@ -57,6 +64,8 @@ Documento de trabalho da Sprint 1. Complementa as ADRs 002, 003 e 005.
 - `X-Content-SHA256` protege contra corrupção no banco, não contra quem controla banco **e** hash; assinatura digital da NF-e não é validada.
 - Logs: garantir que o ambiente de produção não capture corpo de requisições.
 - Segredos: `SEED_ADMIN_PASSWORD` só em ambiente; trocar após o primeiro login.
+- Catálogo legal: quem pode aprovar e ativar regras ainda não foi decidido (decisão nº 2); a restrição a `admin` é provisória e a ativação técnica não equivale a homologação de negócio. Triggers de imutabilidade não protegem contra quem tem DDL no banco (pode desativá-los) — exige usuário de aplicação sem DDL em produção.
+- Busca textual do catálogo usa `ILIKE` com escape de curingas; sem índice de texto (volume pequeno nesta fase).
 
 ## Checklist antes de qualquer ambiente externo
 
