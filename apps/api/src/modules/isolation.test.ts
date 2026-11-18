@@ -3,6 +3,7 @@ import { createHarness, TEST_PASSWORD, type Harness } from "../test/harness.ts";
 import { eq } from "drizzle-orm";
 import { auditEvents, nfeDocuments } from "../db/schema.ts";
 import { ITEM_PASTILHA, syntheticCnpj, syntheticNfe } from "../test/fixtures.ts";
+import { ACTIVATE, APPROVE, CLASSIFICATION_CONDITIONS, createSyntheticNorm, createSyntheticRule, op } from "../test/catalog-fixtures.ts";
 
 /**
  * Isolamento multitenant: cliente A nunca vê dados do cliente B, nem por
@@ -203,5 +204,134 @@ describe("isolamento entre empresas e organizações", () => {
     await h.request({ method: "DELETE", url: "/api/companies/" + companyA.id + "/access/" + insider, cookie: cookieAdmin1 });
     expect((await h.request({ method: "GET", url: "/api/documents/" + documentA, cookie: cookieB })).status).toBe(404);
     expect((await h.request({ method: "GET", url: "/api/documents/" + documentA + "/xml", cookie: cookieB })).status).toBe(404);
+  });
+});
+
+/**
+ * Catálogo legal (2A.1): administração normativa é exclusiva da equipe do
+ * escritório. Toda rota nova do catálogo aparece aqui com teste negativo.
+ */
+describe("isolamento do catálogo legal", () => {
+  let h: Harness;
+  let org1: string;
+  let org2: string;
+  let cliente1: string;
+  let fiscal1: string;
+  let fiscal1b: string;
+  let admin1: string;
+  let fiscal2: string;
+  let norm: { sourceId: string; snapshotId: string; provisionId: string };
+  let rule: { ruleId: string; versionId: string };
+  const MISSING = "00000000-0000-4000-8000-000000000000";
+
+  beforeAll(async () => {
+    h = await createHarness();
+    org1 = (await h.createOrg("Escritório Um")).id;
+    org2 = (await h.createOrg("Escritório Dois")).id;
+    const company = await h.createCompany(org1, { cnpj: syntheticCnpj("510000000001"), legalName: "Cliente Sintético" });
+    const cliente = await h.createUser({ email: "cliente@cat1.local", orgId: org1, role: "cliente" });
+    await h.grantAccess(company.id, cliente.id);
+    await h.createUser({ email: "fiscal@cat1.local", orgId: org1, role: "fiscal" });
+    await h.createUser({ email: "fiscalb@cat1.local", orgId: org1, role: "fiscal" });
+    await h.createUser({ email: "admin@cat1.local", orgId: org1, role: "admin" });
+    await h.createUser({ email: "fiscal@cat2.local", orgId: org2, role: "fiscal" });
+    cliente1 = await h.login("cliente@cat1.local", TEST_PASSWORD);
+    fiscal1 = await h.login("fiscal@cat1.local", TEST_PASSWORD);
+    fiscal1b = await h.login("fiscalb@cat1.local", TEST_PASSWORD);
+    admin1 = await h.login("admin@cat1.local", TEST_PASSWORD);
+    fiscal2 = await h.login("fiscal@cat2.local", TEST_PASSWORD);
+    norm = await createSyntheticNorm(h, fiscal1, org1, { number: "1" });
+    rule = await createSyntheticRule(h, fiscal1, org1, "CLS-ISOLAMENTO", norm.provisionId);
+    expect((await op(h, fiscal1, rule.versionId, "submit")).status).toBe(200);
+  });
+  afterAll(() => h?.close());
+
+  const sourceBody = { kind: "DECRETO", jurisdiction: "FEDERAL", issuer: "Órgão Sintético", number: "77/2099", title: "Norma Sintética nº 77/2099", publishedAt: "2099-01-02", officialUrl: "https://normas.example.invalid/77", licenseStatus: "OFICIAL_PUBLICO" };
+  const versionBody = () => ({ conditions: CLASSIFICATION_CONDITIONS, effectsFrom: "2099-02-01", changeReason: "isolamento sintético", provisions: [{ provisionId: norm.provisionId, role: "FUNDAMENTO" }] });
+  const collectionRoutes = () => [
+    { method: "GET" as const, url: "/api/organizations/" + org1 + "/legal-sources" },
+    { method: "POST" as const, url: "/api/organizations/" + org1 + "/legal-sources", payload: sourceBody },
+    { method: "GET" as const, url: "/api/organizations/" + org1 + "/legal-provisions" },
+    { method: "GET" as const, url: "/api/organizations/" + org1 + "/tax-rules" },
+    { method: "POST" as const, url: "/api/organizations/" + org1 + "/tax-rules", payload: { code: "CLS-INVASOR", title: "Invasor", layer: "CLASSIFICACAO", kind: "SEGMENTO_ST", version: versionBody() } },
+  ];
+  /** Rotas por ID com [URL do recurso real, URL de ID inexistente]. */
+  const byIdRoutes = () => {
+    const pair = (method: "GET" | "POST" | "PATCH", path: (id: string) => string, real: string, payload?: Record<string, unknown>) => ({ method, real: path(real), absent: path(MISSING), payload });
+    return [
+      pair("GET", (id) => "/api/legal-sources/" + id, norm.sourceId),
+      pair("PATCH", (id) => "/api/legal-sources/" + id + "/license", norm.sourceId, { licenseStatus: "LICENCA_NAO_VERIFICADA", justification: "invasão" }),
+      pair("POST", (id) => "/api/legal-sources/" + id + "/snapshots", norm.sourceId, { retrievedAt: "2026-11-01T10:00:00Z", method: "MANUAL", contentSha256: "f".repeat(64) }),
+      pair("POST", (id) => "/api/legal-sources/" + id + "/provisions", norm.sourceId, { snapshotId: norm.snapshotId, reference: "art. 99", effectsFrom: "2099-02-01" }),
+      pair("POST", (id) => "/api/legal-provisions/" + id + "/close-effects", norm.provisionId, { effectsTo: "2099-12-31", reason: "invasão" }),
+      pair("GET", (id) => "/api/tax-rules/" + id, rule.ruleId),
+      pair("POST", (id) => "/api/tax-rules/" + id + "/versions", rule.ruleId, versionBody()),
+      pair("GET", (id) => "/api/tax-rule-versions/" + id, rule.versionId),
+      pair("POST", (id) => "/api/tax-rule-versions/" + id + "/submit", rule.versionId, {}),
+      pair("POST", (id) => "/api/tax-rule-versions/" + id + "/approve", rule.versionId, APPROVE),
+      pair("POST", (id) => "/api/tax-rule-versions/" + id + "/return", rule.versionId, APPROVE),
+      pair("POST", (id) => "/api/tax-rule-versions/" + id + "/activate", rule.versionId, ACTIVATE),
+      pair("POST", (id) => "/api/tax-rule-versions/" + id + "/suspend", rule.versionId, { justification: "invasão" }),
+      pair("POST", (id) => "/api/tax-rule-versions/" + id + "/reactivate", rule.versionId, ACTIVATE),
+      pair("POST", (id) => "/api/tax-rule-versions/" + id + "/revoke", rule.versionId, { justification: "invasão", effectsEndedOn: "2099-12-31" }),
+    ];
+  };
+
+  it("sem sessão: 401 em todas as rotas do catálogo", async () => {
+    for (const route of collectionRoutes()) expect((await h.request({ method: route.method, url: route.url, payload: route.payload })).status, route.url).toBe(401);
+    for (const route of byIdRoutes()) expect((await h.request({ method: route.method, url: route.real, payload: route.payload })).status, route.real).toBe(401);
+  });
+
+  it("cliente da mesma organização: 403 nas coleções e 404 indistinguível nos recursos, mesmo conhecendo os IDs", async () => {
+    for (const route of collectionRoutes()) {
+      const response = await h.request({ method: route.method, url: route.url, cookie: cliente1, payload: route.payload });
+      expect(response.status, route.method + " " + route.url).toBe(403);
+    }
+    for (const route of byIdRoutes()) {
+      const real = await h.request({ method: route.method, url: route.real, cookie: cliente1, payload: route.payload });
+      const absent = await h.request({ method: route.method, url: route.absent, cookie: cliente1, payload: route.payload });
+      expect(real.status, route.method + " " + route.real).toBe(404);
+      expect(real.body, route.real).toEqual(absent.body);
+    }
+  });
+
+  it("fiscal de outra organização: 404 em tudo, inclusive coleções, sem revelar existência", async () => {
+    for (const route of collectionRoutes()) {
+      const response = await h.request({ method: route.method, url: route.url, cookie: fiscal2, payload: route.payload });
+      expect(response.status, route.method + " " + route.url).toBe(404);
+    }
+    for (const route of byIdRoutes()) {
+      const real = await h.request({ method: route.method, url: route.real, cookie: fiscal2, payload: route.payload });
+      const absent = await h.request({ method: route.method, url: route.absent, cookie: fiscal2, payload: route.payload });
+      expect(real.status, route.method + " " + route.real).toBe(404);
+      expect(real.body, route.real).toEqual(absent.body);
+    }
+    // Listagens da própria organização não trazem nada da outra.
+    expect((await h.request({ method: "GET", url: "/api/organizations/" + org2 + "/tax-rules", cookie: fiscal2 })).body.rules).toEqual([]);
+    expect((await h.request({ method: "GET", url: "/api/organizations/" + org2 + "/legal-sources", cookie: fiscal2 })).body.sources).toEqual([]);
+  });
+
+  it("organizationId no corpo não é aceito nem redireciona a escrita; dispositivo alheio é indistinguível de inexistente", async () => {
+    const injected = await h.request({ method: "POST", url: "/api/organizations/" + org2 + "/legal-sources", cookie: fiscal2, payload: { ...sourceBody, organizationId: org1 } });
+    expect(injected.status).toBe(400);
+    // Fiscal da org 2 tenta citar o dispositivo da org 1 na própria regra.
+    const foreign = await h.request({ method: "POST", url: "/api/organizations/" + org2 + "/tax-rules", cookie: fiscal2, payload: { code: "CLS-ALHEIO", title: "Dispositivo alheio", layer: "CLASSIFICACAO", kind: "SEGMENTO_ST", version: versionBody() } });
+    const missing = await h.request({ method: "POST", url: "/api/organizations/" + org2 + "/tax-rules", cookie: fiscal2, payload: { code: "CLS-ALHEIO", title: "Dispositivo alheio", layer: "CLASSIFICACAO", kind: "SEGMENTO_ST", version: { ...versionBody(), provisions: [{ provisionId: MISSING, role: "FUNDAMENTO" }] } } });
+    expect(foreign.status).toBe(422);
+    expect(foreign.body.error.message).toBe(missing.body.error.message);
+    expect((await h.request({ method: "GET", url: "/api/organizations/" + org1 + "/tax-rules", cookie: fiscal1 })).body.rules.map((r: { code: string }) => r.code)).toEqual(["CLS-ISOLAMENTO"]);
+  });
+
+  it("nada do que foi tentado por cliente ou outra organização mudou o catálogo ou gerou trilha", async () => {
+    const detail = await h.request({ method: "GET", url: "/api/tax-rule-versions/" + rule.versionId, cookie: fiscal1 });
+    expect(detail.body.version.status).toBe("EM_REVISAO_TECNICA");
+    expect(detail.body.trail.map((t: { action: string }) => t.action)).toEqual(["SUBMETE"]);
+    const source = await h.request({ method: "GET", url: "/api/legal-sources/" + norm.sourceId, cookie: fiscal1 });
+    expect(source.body.source.licenseStatus).toBe("OFICIAL_PUBLICO");
+    expect(source.body.snapshots).toHaveLength(1);
+    expect(source.body.provisions).toHaveLength(1);
+    // Usuários legítimos continuam operando: o fluxo segue com outra pessoa.
+    expect((await op(h, fiscal1b, rule.versionId, "approve", APPROVE)).status).toBe(200);
+    expect((await op(h, admin1, rule.versionId, "activate", ACTIVATE)).status).toBe(200);
   });
 });
