@@ -21,6 +21,12 @@ const schema = z.object({
   COOKIE_SECURE: z.enum(["true", "false"]).optional(),
   TRUST_PROXY: z.enum(["true", "false"]).default("false"),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
+  /**
+   * Catálogo legal: exige que quem ativa uma versão seja diferente de quem a
+   * aprovou (além de diferente do autor). Padrão "false" até a decisão nº 2
+   * da especificação 2A (quem aprova regras e se a ativação exige terceira pessoa).
+   */
+  RULE_ACTIVATION_REQUIRES_THIRD_PERSON: z.enum(["true", "false"]).default("false"),
   /** Diretório com build do frontend para servir no mesmo origin (opcional). */
   WEB_DIST_DIR: z.string().optional(),
 });
