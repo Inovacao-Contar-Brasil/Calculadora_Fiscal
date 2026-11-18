@@ -22,6 +22,20 @@
       "when": 1795094504588,
       "tag": "0002_rejeicao_fora_da_vigencia",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1795097114553,
+      "tag": "0003_catalogo_legal",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1795097128430,
+      "tag": "0004_catalogo_legal_integridade",
+      "breakpoints": true
     }
   ]
 }
