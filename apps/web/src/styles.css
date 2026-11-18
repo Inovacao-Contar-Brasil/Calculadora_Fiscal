@@ -51,3 +51,11 @@ table.compact{min-width:720px}table.compact td{white-space:normal}tr.clickable{c
 .twocol{display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start}
 .empty{min-height:160px;padding:24px}
 @media(max-width:900px){.twocol,.formgrid{grid-template-columns:1fr}.nav{display:none}}
+
+/* --- Catálogo legal (Sprint 2A.1) --- */
+.badge.rascunho{background:#f3f4f2;color:#56645b;border:1px solid #dde2dc}.badge.em_revisao_tecnica{background:#eaf1fb;color:#2b4f7e;border:1px solid #c6d8f0}.badge.aprovada{background:#f0f7ff;color:#1f4f86;border:1px solid #b9d3f1}.badge.ativa{background:#ecf7ed;color:#2f5d41;border:1px solid #cfe5d2}.badge.suspensa{background:#fff6e7;color:#7c5315;border:1px solid #f1d6aa}.badge.substituida,.badge.revogada{background:#f6f1f0;color:#7a5a52;border:1px solid #e6d6d2}
+.badge.lic_ok{background:#ecf7ed;color:#2f5d41;border:1px solid #cfe5d2}.badge.lic_warn{background:#fff0ed;color:#a33221;border:1px solid #f4c6bc}
+pre.code{background:#f8faf8;border:1px solid #e1e9e1;border-radius:10px;padding:14px;font-size:12px;overflow:auto;max-height:360px;margin:0}
+textarea.code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
+.issues{margin:0;padding-left:18px;line-height:1.7;font-size:13px}
+.kv{display:grid;grid-template-columns:max-content 1fr;gap:6px 16px;font-size:13px;margin:0}.kv dt{color:#718078}.kv dd{margin:0;overflow-wrap:anywhere}

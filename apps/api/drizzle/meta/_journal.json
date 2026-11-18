@@ -8,6 +8,20 @@
       "when": 1794580964727,
       "tag": "0000_fundacao",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1795005761201,
+      "tag": "0001_catalogo_legal",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795005766827,
+      "tag": "0002_catalogo_legal_integridade",
+      "breakpoints": true
     }
   ]
 }

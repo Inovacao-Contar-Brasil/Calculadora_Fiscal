@@ -16,6 +16,7 @@ export function Layout({ children }: { children: ReactNode }) {
           <nav className="nav" aria-label="Principal">
             <Link to="/empresas" className={isActive("/empresas")}>Empresas</Link>
             {hasRole("admin", "fiscal") && <Link to="/revisao" className={isActive("/revisao")}>Revisão fiscal</Link>}
+            {hasRole("admin", "fiscal") && <Link to="/catalogo" className={isActive("/catalogo")}>Catálogo legal</Link>}
             {hasRole("admin") && <Link to="/admin" className={isActive("/admin")}>Administração</Link>}
           </nav>
         )}
