@@ -6,6 +6,7 @@ import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import { existsSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { assertMigrationHistory } from "./migration-history.ts";
 import * as schema from "./schema.ts";
 
 /** Tipo comum aos dois drivers (node-postgres e PGlite) e às transações. */
@@ -33,6 +34,7 @@ function resolveMigrationsFolder(): string {
   throw new Error("Pasta de migrações não encontrada; defina MIGRATIONS_DIR.");
 }
 const migrationsFolder = resolveMigrationsFolder();
+export { migrationsFolder };
 
 /**
  * Cria a conexão. O mesmo esquema e as mesmas migrações SQL servem aos dois
@@ -47,7 +49,12 @@ export async function createDatabase(options: DatabaseOptions): Promise<Database
     return {
       db,
       kind: "postgres",
-      migrate: () => migratePg(db, { migrationsFolder }),
+      // O guarda recusa histórico não canônico antes de o Drizzle tocar no banco
+      // (migration-history.ts; o Drizzle decide só pelo created_at do último registro).
+      migrate: async () => {
+        await assertMigrationHistory(db, migrationsFolder);
+        await migratePg(db, { migrationsFolder });
+      },
       close: () => pool.end(),
     };
   }
@@ -58,7 +65,10 @@ export async function createDatabase(options: DatabaseOptions): Promise<Database
   return {
     db,
     kind: "pglite",
-    migrate: () => migratePglite(db, { migrationsFolder }),
+    migrate: async () => {
+      await assertMigrationHistory(db, migrationsFolder);
+      await migratePglite(db, { migrationsFolder });
+    },
     close: () => client.close(),
   };
 }

@@ -84,6 +84,30 @@ export async function createHarness(envOverrides: Record<string, string> = {}): 
   return bindHarness(app, handle, release);
 }
 
+/**
+ * Sobe a API sobre um banco **já existente**, sem migrar, criar ou remover o
+ * banco. Serve aos testes de upgrade (CF-INTEG-01): popular pela API um banco
+ * parado num estado intermediário do histórico e reabri-lo depois do upgrade.
+ * O `close()` fecha só a API; o banco continua com quem o abriu.
+ */
+export async function createHarnessOnDatabase(handle: DatabaseHandle, envOverrides: Record<string, string> = {}): Promise<Harness> {
+  const config = loadConfig({
+    NODE_ENV: "test",
+    PGLITE_DIR: "memory://",
+    ALLOWED_ORIGINS: "http://localhost:5173",
+    LOG_LEVEL: "silent",
+    COOKIE_SECURE: "false",
+    SESSION_TTL_HOURS: "1",
+    LOGIN_RATE_LIMIT_MAX: "1000",
+    ...envOverrides,
+  });
+  const app = await buildApp({ db: handle.db, config, logger: false });
+  await app.ready();
+  return bindHarness(app, handle, async () => {
+    await app.close();
+  });
+}
+
 function bindHarness(app: FastifyInstance, handle: DatabaseHandle, release: () => Promise<void>): Harness {
   const request: Harness["request"] = async ({ cookie, ...options }) => {
     const headers: Record<string, string> = { ...(options.headers as Record<string, string> | undefined) };

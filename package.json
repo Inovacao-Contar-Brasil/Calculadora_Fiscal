@@ -18,6 +18,7 @@
     "db:generate": "npm run db:generate --workspace apps/api",
     "db:check": "npm run db:check --workspace apps/api",
     "db:seed": "npm run db:seed --workspace apps/api",
+    "db:reconcile": "npm run db:reconcile --workspace apps/api --",
     "verify": "npm run typecheck && npm test && npm run build"
   },
   "devDependencies": {

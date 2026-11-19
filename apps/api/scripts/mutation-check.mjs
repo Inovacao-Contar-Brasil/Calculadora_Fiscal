@@ -25,6 +25,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../.
 const api = (file) => path.join(root, "apps/api", file);
 const T_TEMPORAL = "apps/api/src/modules/temporal-pendencies.test.ts";
 const T_R2 = "apps/api/src/modules/temporal-pendencies-r2.test.ts";
+const T_HISTORY = "apps/api/src/db/migration-history.test.ts";
 
 const MUTATIONS = [
   {
@@ -91,6 +92,72 @@ const MUTATIONS = [
     test: T_R2,
     filter: "P2: pendência com mais de 500 itens",
   },
+  // --- CF-INTEG-01: histórico de migrações integrado (migration-history.ts, docs/MIGRACOES.md) ---
+  {
+    id: "H1",
+    name: "migrate() sem o guarda de histórico (legado do PR #9 passa)",
+    file: api("src/db/migration-history.ts"),
+    from: "  if (state.kind === \"LEGACY_PR9_CATALOG\") {\n    throw new MigrationHistoryError(\n      \"HISTORICO_LEGADO_PR9\",",
+    to: "  if (false) {\n    throw new MigrationHistoryError(\n      \"HISTORICO_LEGADO_PR9\",",
+    test: T_HISTORY,
+    filter: "banco com o histórico antigo do PR #9",
+  },
+  {
+    id: "H2",
+    name: "journal com when fora de ordem aceito (catálogo pulado em silêncio)",
+    file: api("src/db/migration-history.ts"),
+    from: "    if (!(journal[i]!.when > journal[i - 1]!.when)) {",
+    to: "    if (false) {",
+    test: T_HISTORY,
+    filter: "renumerar sem refazer o journal",
+  },
+  {
+    id: "H3",
+    name: "histórico com lacuna aceito como canônico",
+    file: api("src/db/migration-history.ts"),
+    from: "    const isPrefix = canonicalTags.every((tag, i) => journalTags[i] === tag);\n    if (!isPrefix) return",
+    to: "    const isPrefix = true;\n    if (!isPrefix) return",
+    test: T_HISTORY,
+    filter: "classifica históricos",
+  },
+  {
+    id: "H4",
+    name: "reconciliação sem conferir o banco físico",
+    file: api("src/db/migration-history.ts"),
+    from: "    await assertPhysicalState(tx, state);",
+    to: "    void assertPhysicalState;",
+    test: T_HISTORY,
+    filter: "histórico que não confere com o banco físico",
+  },
+  {
+    id: "H5",
+    name: "reconciliação não re-data o catálogo",
+    file: api("src/db/migration-history.ts"),
+    from: "    for (const row of current.retime) {",
+    to: "    for (const row of current.retime.slice(2)) {",
+    test: T_HISTORY,
+    filter: "banco que passou pelo PR #9 e depois pelo PR #10",
+  },
+  {
+    id: "H6",
+    name: "reconciliação executa SQL fora da transação (falha parcial persiste)",
+    file: api("src/db/migration-history.ts"),
+    from: "      for (const statement of migration.statements) await tx.execute(sql.raw(statement));",
+    to: "      for (const statement of migration.statements) await db.execute(sql.raw(statement));",
+    test: T_HISTORY,
+    filter: "falha parcial na reconciliação",
+    // No PGlite há uma conexão só: `db` e `tx` são a mesma sessão e a mutação não muda nada.
+    postgresOnly: true,
+  },
+  {
+    id: "H7",
+    name: "catálogo com o when original do PR #9 (renomeação ingênua)",
+    file: api("drizzle/meta/_journal.json"),
+    from: "\"when\": 1795097114553,",
+    to: "\"when\": 1795005761201,",
+    test: T_HISTORY,
+    filter: "sequência exata",
+  },
 ];
 
 const postgres = !!process.env.TEST_DATABASE_URL;
@@ -139,4 +206,4 @@ if (survived.length) {
   console.error("\n" + survived.length + " mutação(ões) sobreviveram: os testes não protegem essas garantias.");
   process.exit(1);
 }
-console.log("\nTodas as mutações executadas foram detectadas" + (postgres ? " (PostgreSQL real)." : " (PGlite; M1 exige PostgreSQL)."));
+console.log("\nTodas as mutações executadas foram detectadas" + (postgres ? " (PostgreSQL real)." : " (PGlite; M1 e H6 exigem PostgreSQL)."));

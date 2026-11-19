@@ -11,7 +11,8 @@
     "test:mutations": "node scripts/mutation-check.mjs",
     "db:generate": "drizzle-kit generate",
     "db:check": "drizzle-kit check",
-    "db:seed": "tsx --env-file-if-exists=.env src/db/seed.ts"
+    "db:seed": "tsx --env-file-if-exists=.env src/db/seed.ts",
+    "db:reconcile": "tsx --env-file-if-exists=.env src/db/reconcile.ts"
   },
   "dependencies": {
     "@calculadora-fiscal/domain": "*",
