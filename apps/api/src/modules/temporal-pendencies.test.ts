@@ -3,6 +3,7 @@ import { and, eq, isNotNull } from "drizzle-orm";
 import { auditEvents, nfeDocuments, nfeItems, reviewItems } from "../db/schema.ts";
 import { createHarness, TEST_PASSWORD, type Harness } from "../test/harness.ts";
 import { syntheticCnpj, syntheticNfe, type SyntheticItem } from "../test/fixtures.ts";
+import { classificationFor, decisionCovers, isFinalDecision, issueDateOf, selectReviewFor } from "./classification.ts";
 
 /**
  * Issue #8 — CF-FOUND-08-TEMPORAL. Uma NF-e emitida fora da vigência de uma
@@ -65,6 +66,40 @@ describe("pendência temporal: NF-e fora da vigência de classificação homolog
       .innerJoin(reviewItems, eq(reviewItems.id, nfeItems.reviewItemId))
       .where(and(eq(nfeItems.companyId, companyId), eq(nfeItems.description, description)));
     return rows.sort((a, b) => a.issuedAt.localeCompare(b.issuedAt));
+  };
+
+  /**
+   * Invariantes da linha do tempo, conferidos no estado persistido: vigências de
+   * decisões finais disjuntas; exatamente um item aberto; cada nota vinculada à
+   * decisão que a regra única escolheria e com o status que ela determina.
+   */
+  const assertTimelineInvariants = async (companyId: string, description: string) => {
+    const timeline = await h.db.select().from(reviewItems).where(and(eq(reviewItems.companyId, companyId), eq(reviewItems.description, description)));
+    const open = timeline.filter((r) => r.validTo === null);
+    expect(open).toHaveLength(1);
+    const finals = timeline.filter(isFinalDecision);
+    for (const a of finals) {
+      for (const b of finals) {
+        if (a.id === b.id) continue;
+        const disjoint = (a.validTo !== null && b.validFrom !== null && a.validTo < b.validFrom) || (b.validTo !== null && a.validFrom !== null && b.validTo < a.validFrom);
+        expect(disjoint, "vigências sobrepostas: " + a.id + " × " + b.id).toBe(true);
+      }
+    }
+    const items = await h.db
+      .select({ id: nfeItems.id, reviewItemId: nfeItems.reviewItemId, status: nfeItems.classificationStatus, issuedAt: nfeDocuments.issuedAt })
+      .from(nfeItems)
+      .innerJoin(nfeDocuments, eq(nfeDocuments.id, nfeItems.documentId))
+      .where(and(eq(nfeItems.companyId, companyId), eq(nfeItems.description, description)));
+    for (const item of items) {
+      const date = issueDateOf(item.issuedAt);
+      const expected = selectReviewFor(open[0]!, timeline, date);
+      expect(item.reviewItemId, "vínculo da nota de " + date).toBe(expected.id);
+      expect(item.status, "status da nota de " + date).toBe(classificationFor(expected, date));
+      // Nenhuma nota pendente presa a decisão encerrada que não a cobre (órfã invisível).
+      const linked = timeline.find((r) => r.id === item.reviewItemId)!;
+      if (linked.validTo !== null) expect(decisionCovers(linked, date)).toBe(true);
+    }
+    return { timeline, items };
   };
 
   beforeAll(async () => {
@@ -202,6 +237,7 @@ describe("pendência temporal: NF-e fora da vigência de classificação homolog
     expect(rejected.status, rejected.raw).toBe(201);
     expect(await itemOf(august)).toMatchObject({ item: { classificationStatus: "REJEITADO" }, status: "COM_PENDENCIAS" });
     expect((await pendencies()).body.items).toHaveLength(0);
+    await assertTimelineInvariants(company.id, PNEU.description);
   });
 
   it("duas resoluções simultâneas da mesma pendência: exatamente uma vence e só ela é auditada", async () => {
@@ -209,16 +245,20 @@ describe("pendência temporal: NF-e fora da vigência de classificação homolog
     const doc = await importNote("9101", "2026-10-03T10:00:00-03:00", item);
     const id = (await itemOf(doc)).item.reviewItemId as string;
     expect((await homologar(id, "2026-11-01")).status).toBe(200);
-    const results = await Promise.all([
-      resolve(id, periodDecision("2026-10-01", "2026-10-31"), fiscal),
-      resolve(id, periodDecision("2026-10-01", "2026-10-31"), fiscal2),
-    ]);
-    expect(results.map((r) => r.status).sort()).toEqual([201, 409]);
+    // Várias requisições para abrir de fato a janela de corrida no PostgreSQL real. O pool
+    // é aquecido antes: sem isso, as conexões novas atrasam as requisições seguintes e a
+    // primeira termina sozinha (corrida não exercitada — verificado removendo o lock).
+    await Promise.all(Array.from({ length: 8 }, () => pendencies()));
+    const results = await Promise.all(
+      Array.from({ length: 6 }, (_, index) => resolve(id, periodDecision("2026-10-01", "2026-10-31"), index % 2 ? fiscal2 : fiscal)),
+    );
+    expect(results.map((r) => r.status).sort()).toEqual([201, 409, 409, 409, 409, 409]);
     const events = await h.db.select().from(auditEvents).where(and(eq(auditEvents.entityType, "temporal_pendency"), eq(auditEvents.entityId, id)));
     expect(events).toHaveLength(1);
     const periodRows = await h.db.select().from(reviewItems).where(and(eq(reviewItems.companyId, company.id), eq(reviewItems.description, item.description), isNotNull(reviewItems.validTo)));
     expect(periodRows).toHaveLength(1);
     expect(await itemOf(doc)).toMatchObject({ item: { classificationStatus: "HOMOLOGADO", reviewItemId: periodRows[0]!.id } });
+    await assertTimelineInvariants(company.id, item.description);
   });
 
   it("resolução concorrente com importação de nota do mesmo período converge para o mesmo estado", async () => {
@@ -234,6 +274,27 @@ describe("pendência temporal: NF-e fora da vigência de classificação homolog
       ["9201", "HOMOLOGADO", resolved.body.decision.id],
       ["9202", "HOMOLOGADO", resolved.body.decision.id],
     ]);
+    await assertTimelineInvariants(company.id, item.description);
+  });
+
+  it("reabertura e resolução simultâneas sobre a mesma decisão: estado final coerente, sem órfãs", async () => {
+    const item = product("CC-03", "BICO SINTETICO CONCORRENTE", "84818092");
+    const oct = await importNote("9251", "2026-10-03T10:00:00-03:00", item);
+    await importNote("9252", "2026-11-10T10:00:00-03:00", item);
+    const id = (await itemOf(oct)).item.reviewItemId as string;
+    expect((await homologar(id, "2026-11-01")).status).toBe(200);
+    await Promise.all(Array.from({ length: 4 }, () => pendencies()));
+    const [resolved, reopened] = await Promise.all([
+      resolve(id, periodDecision("2026-10-01", "2026-10-31")),
+      h.request({ method: "POST", url: "/api/review-items/" + id + "/reopen", cookie: fiscal2, payload: { validTo: "2026-12-31", reason: "Mudança legal sintética simultânea" } }),
+    ]);
+    expect(reopened.status).toBe(201);
+    // A resolução vence se chegou antes; se a reabertura venceu, a nota de outubro já está na nova análise.
+    expect([201, 409]).toContain(resolved.status);
+    const after = await itemOf(oct);
+    if (resolved.status === 201) expect(after.item).toMatchObject({ classificationStatus: "HOMOLOGADO", reviewItemId: resolved.body.decision.id });
+    else expect(after.item).toMatchObject({ classificationStatus: "PENDENTE_REVISAO", reviewItemId: reopened.body.item.id });
+    await assertTimelineInvariants(company.id, item.description);
   });
 
   it("nota posterior ao encerramento vai para a nova análise; reabertura não deixa notas órfãs", async () => {
@@ -277,6 +338,20 @@ describe("pendência temporal: NF-e fora da vigência de classificação homolog
     expect((await resolve(newId, periodDecision("2027-01-01", "2027-01-31"))).status).toBe(201);
     expect(await itemOf(jan)).toMatchObject({ item: { classificationStatus: "HOMOLOGADO" } });
     expect(await itemOf(oct)).toMatchObject({ item: { classificationStatus: "PENDENTE_REVISAO", reviewItemId: newId } });
+    await assertTimelineInvariants(company.id, item.description);
+  });
+
+  it("decisão sem data de início depois de reabertura com fim futuro começa no dia seguinte ao fim", async () => {
+    const item = product("RO-03", "PARAFUSO SINTETICO VIGENCIA FUTURA", "73181500");
+    const doc = await importNote("9451", "2026-10-10T10:00:00-03:00", item);
+    const id = (await itemOf(doc)).item.reviewItemId as string;
+    expect((await homologar(id, "2026-01-01")).status).toBe(200);
+    const reopened = await h.request({ method: "POST", url: "/api/review-items/" + id + "/reopen", cookie: fiscal, payload: { validTo: "2099-12-30", reason: "Encerramento futuro sintético" } });
+    expect(reopened.status).toBe(201);
+    const rejected = await decide(reopened.body.item.id, { status: "REJEITADO", justification: "Rejeição sintética sem data de início." });
+    expect(rejected.status).toBe(200);
+    expect(rejected.body.item).toMatchObject({ status: "REJEITADO", validFrom: "2099-12-31" });
+    await assertTimelineInvariants(company.id, item.description);
   });
 
   it("reabrir exige uma decisão final: item pendente não tem vigência a encerrar", async () => {
@@ -303,6 +378,8 @@ describe("pendência temporal: NF-e fora da vigência de classificação homolog
     // Empresa A: todas as notas antes das decisões. Empresa B: só janeiro antes; outubro e novembro depois.
     const a = await sequence(company, ["out", "nov", "jan"], []);
     const b = await sequence(companyB, ["jan"], ["nov", "out"]);
+    await assertTimelineInvariants(company.id, item.description);
+    await assertTimelineInvariants(companyB.id, item.description);
     expect(b).toEqual(a);
     expect(a).toEqual([
       { number: "9501", status: "PENDENTE_REVISAO", decision: "NOVA_ANALISE" },

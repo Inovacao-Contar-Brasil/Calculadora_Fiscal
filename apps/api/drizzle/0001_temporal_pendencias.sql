@@ -1,0 +1,2 @@
+CREATE INDEX "nfe_items_review_item_idx" ON "nfe_items" USING btree ("review_item_id");--> statement-breakpoint
+ALTER TABLE "review_items" ADD CONSTRAINT "review_items_vigencia_ordenada_chk" CHECK ("review_items"."valid_from" is null or "review_items"."valid_to" is null or "review_items"."valid_from" <= "review_items"."valid_to");

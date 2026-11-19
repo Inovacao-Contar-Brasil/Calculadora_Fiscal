@@ -204,4 +204,67 @@ describe("isolamento entre empresas e organizações", () => {
     expect((await h.request({ method: "GET", url: "/api/documents/" + documentA, cookie: cookieB })).status).toBe(404);
     expect((await h.request({ method: "GET", url: "/api/documents/" + documentA + "/xml", cookie: cookieB })).status).toBe(404);
   });
+
+  it("pendências temporais: só staff do escopo lê e resolve; fora do escopo responde igual a inexistente", async () => {
+    // Pendência sintética na empresa A: nota de outubro, homologação a partir de novembro.
+    const item = { code: "ISO-T1", description: "PRODUTO SINTETICO ISOLAMENTO TEMPORAL", ncm: "40111000", productCents: 1000 };
+    const xml = syntheticNfe({ number: "1501", issuedAt: "2026-10-01T10:00:00-03:00", recipientCnpj: companyA.cnpj, items: [item] });
+    const imported = await h.request({ method: "POST", url: "/api/companies/" + companyA.id + "/documents", cookie: cookieA, headers: { "content-type": "application/xml" }, payload: xml });
+    expect(imported.status).toBe(201);
+    const ownDoc = await h.request({ method: "GET", url: "/api/documents/" + imported.body.document.id, cookie: cookieA });
+    const pendencyId = ownDoc.body.items[0].reviewItemId as string;
+    const secret = "Justificativa interna sintética que o cliente não pode ler";
+    const homologated = await h.request({
+      method: "PATCH",
+      url: "/api/review-items/" + pendencyId,
+      cookie: cookieFiscal1,
+      payload: { status: "HOMOLOGADO", justification: secret, decision: { enquadramento: "Enquadramento sintético", fundamentoLegal: "Norma Sintética nº 2/2099" }, validFrom: "2026-11-01" },
+    });
+    expect(homologated.status).toBe(200);
+    const resolveBody = { status: "REJEITADO", validFrom: "2026-10-01", validTo: "2026-10-31", justification: "Tentativa fora do escopo (sintética)." };
+    const missing = "00000000-0000-4000-8000-000000000000";
+
+    // Staff da organização lê.
+    const list = await h.request({ method: "GET", url: "/api/temporal-pendencies", cookie: cookieFiscal1 });
+    expect(list.status).toBe(200);
+    expect(list.body.items.map((p: { id: string }) => p.id)).toEqual([pendencyId]);
+    expect((await h.request({ method: "GET", url: "/api/temporal-pendencies?companyId=" + companyA.id, cookie: cookieAdmin1 })).status).toBe(200);
+    expect((await h.request({ method: "GET", url: "/api/temporal-pendencies/" + pendencyId, cookie: cookieAdmin1 })).status).toBe(200);
+
+    // Cliente com acesso à empresa: não lê nem resolve o fluxo interno (403).
+    expect((await h.request({ method: "GET", url: "/api/temporal-pendencies", cookie: cookieA })).status).toBe(403);
+    expect((await h.request({ method: "GET", url: "/api/temporal-pendencies?companyId=" + companyA.id, cookie: cookieA })).status).toBe(403);
+    expect((await h.request({ method: "GET", url: "/api/temporal-pendencies/" + pendencyId, cookie: cookieA })).status).toBe(403);
+    expect((await h.request({ method: "POST", url: "/api/temporal-pendencies/" + pendencyId + "/resolve", cookie: cookieA, payload: resolveBody })).status).toBe(403);
+    // ...e continua vendo só o status no próprio documento, sem justificativa interna.
+    const clientView = await h.request({ method: "GET", url: "/api/documents/" + imported.body.document.id, cookie: cookieA });
+    expect(clientView.body.items[0].classificationStatus).toBe("PENDENTE_REVISAO");
+    expect(clientView.raw).not.toContain(secret);
+    expect(clientView.raw).not.toContain("Norma Sintética nº 2/2099");
+
+    // Cliente sem acesso e staff de outra organização: 404 com o mesmo corpo de inexistente.
+    for (const cookie of [cookieB, cookieFiscal2]) {
+      expect((await h.request({ method: "GET", url: "/api/temporal-pendencies?companyId=" + companyA.id, cookie })).status).toBe(404);
+      const outOfScope = await h.request({ method: "GET", url: "/api/temporal-pendencies/" + pendencyId, cookie });
+      const absent = await h.request({ method: "GET", url: "/api/temporal-pendencies/" + missing, cookie });
+      expect(outOfScope.status).toBe(404);
+      expect(outOfScope.body).toEqual(absent.body);
+      const resolveOut = await h.request({ method: "POST", url: "/api/temporal-pendencies/" + pendencyId + "/resolve", cookie, payload: resolveBody });
+      const resolveAbsent = await h.request({ method: "POST", url: "/api/temporal-pendencies/" + missing + "/resolve", cookie, payload: resolveBody });
+      expect(resolveOut.status).toBe(404);
+      expect(resolveOut.body).toEqual(resolveAbsent.body);
+    }
+    expect((await h.request({ method: "GET", url: "/api/temporal-pendencies", cookie: cookieB })).status).toBe(403);
+    expect((await h.request({ method: "GET", url: "/api/temporal-pendencies", cookie: cookieFiscal2 })).body.items).toEqual([]);
+    // Item de revisão sem pendência temporal responde como inexistente.
+    const plainReview = (await h.request({ method: "GET", url: "/api/review-items", cookie: cookieFiscal1 })).body.items.find((r: { id: string }) => r.id !== pendencyId).id;
+    const noPendency = await h.request({ method: "GET", url: "/api/temporal-pendencies/" + plainReview, cookie: cookieFiscal1 });
+    expect(noPendency.status).toBe(404);
+    expect(noPendency.body).toEqual((await h.request({ method: "GET", url: "/api/temporal-pendencies/" + missing, cookie: cookieFiscal1 })).body);
+
+    // Nada foi gravado pelas tentativas negadas; o staff da organização resolve.
+    const denied = await h.db.select().from(auditEvents).where(eq(auditEvents.entityId, pendencyId));
+    expect(denied.map((e) => e.action)).not.toContain("TEMPORAL_PENDENCY_RESOLVED");
+    expect((await h.request({ method: "POST", url: "/api/temporal-pendencies/" + pendencyId + "/resolve", cookie: cookieFiscal1, payload: resolveBody })).status).toBe(201);
+  });
 });

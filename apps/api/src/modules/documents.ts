@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { createHash } from "node:crypto";
-import { and, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { MAX_XML_BYTES, parseNfe, productFingerprint, type Invoice } from "@calculadora-fiscal/domain";
@@ -13,7 +13,7 @@ import { AppError, asNotFound, badRequest, notFound, unprocessable } from "../er
 
 const DOCUMENT_NOT_FOUND = "Documento não encontrado.";
 import { clientIp, idParams, requireAuth } from "../http.ts";
-import { classificationFor, issueDateOf } from "./classification.ts";
+import { classificationFor, issueDateOf, selectReviewFor } from "./classification.ts";
 
 type DocumentRow = typeof nfeDocuments.$inferSelect;
 type ItemRow = typeof nfeItems.$inferSelect;
@@ -137,44 +137,60 @@ export async function importNfe(
         })
         .returning();
 
-      // Um review_item por produto distinto (fingerprint) e empresa, enquanto vigente.
-      const byFingerprint = new Map<string, typeof reviewItems.$inferSelect>();
-      let pendingCount = 0;
-      for (const item of invoice.items) {
-        const fingerprint = productFingerprint(item);
-        let review = byFingerprint.get(fingerprint);
-        if (!review) {
-          // Duas NF-e distintas podem criar a revisão do mesmo produto em paralelo.
-          // UPSERT pelo índice único parcial evita colisão SELECT -> INSERT e
-          // incrementa occurrences atomicamente por NF-e (não por linha de produto).
-          const [upserted] = await tx
-            .insert(reviewItems)
-            .values({
-              organizationId: company.organizationId,
-              companyId: company.id,
-              fingerprint,
-              ncm: item.ncm,
-              cest: item.cest,
-              description: item.description,
-              status: "PENDENTE_REVISAO",
-              firstDocumentId: doc!.id,
+      // Um review_item aberto por produto distinto (fingerprint) e empresa. Duas NF-e
+      // distintas podem criar a revisão do mesmo produto em paralelo: UPSERT pelo índice
+      // único parcial evita colisão SELECT -> INSERT e incrementa occurrences atomicamente
+      // por NF-e (não por linha de produto). O UPSERT trava a linha aberta até o commit —
+      // o mesmo lock das decisões, reaberturas e decisões de período (lockOpenReview) —, e
+      // os produtos são processados em ordem fixa para que importações concorrentes
+      // travem na mesma ordem (sem deadlock).
+      const lines = invoice.items.map((item) => ({ item, fingerprint: productFingerprint(item) }));
+      const firstLineOf = new Map<string, (typeof lines)[number]["item"]>();
+      for (const { item, fingerprint } of lines) if (!firstLineOf.has(fingerprint)) firstLineOf.set(fingerprint, item);
+      const openByFingerprint = new Map<string, typeof reviewItems.$inferSelect>();
+      for (const fingerprint of [...firstLineOf.keys()].sort()) {
+        const item = firstLineOf.get(fingerprint)!;
+        const [upserted] = await tx
+          .insert(reviewItems)
+          .values({
+            organizationId: company.organizationId,
+            companyId: company.id,
+            fingerprint,
+            ncm: item.ncm,
+            cest: item.cest,
+            description: item.description,
+            status: "PENDENTE_REVISAO",
+            firstDocumentId: doc!.id,
+            lastDocumentId: doc!.id,
+          })
+          .onConflictDoUpdate({
+            target: [reviewItems.companyId, reviewItems.fingerprint],
+            targetWhere: isNull(reviewItems.validTo),
+            set: {
+              occurrences: sql`${reviewItems.occurrences} + 1`,
               lastDocumentId: doc!.id,
-            })
-            .onConflictDoUpdate({
-              target: [reviewItems.companyId, reviewItems.fingerprint],
-              targetWhere: isNull(reviewItems.validTo),
-              set: {
-                occurrences: sql`${reviewItems.occurrences} + 1`,
-                lastDocumentId: doc!.id,
-                updatedAt: new Date(),
-              },
-            })
-            .returning();
-          review = upserted!;
-          byFingerprint.set(fingerprint, review);
-        }
+              updatedAt: new Date(),
+            },
+          })
+          .returning();
+        openByFingerprint.set(fingerprint, upserted!);
+      }
+      // Decisões encerradas e de período do produto: a nota se vincula à que cobre a
+      // sua emissão (selectReviewFor), independentemente da ordem de importação.
+      const closedRows = await tx
+        .select()
+        .from(reviewItems)
+        .where(and(eq(reviewItems.companyId, company.id), inArray(reviewItems.fingerprint, [...openByFingerprint.keys()]), isNotNull(reviewItems.validTo)));
+
+      let pendingCount = 0;
+      let outOfValidityCount = 0;
+      for (const { item, fingerprint } of lines) {
+        const open = openByFingerprint.get(fingerprint)!;
+        const review = selectReviewFor(open, closedRows.filter((row) => row.fingerprint === fingerprint), issueDate);
         const status = classificationFor(review, issueDate);
         if (status !== "HOMOLOGADO") pendingCount += 1;
+        // Homologação que não cobre a emissão: a nota entra na pendência temporal.
+        if (status === "PENDENTE_REVISAO" && review.status === "HOMOLOGADO") outOfValidityCount += 1;
         await tx.insert(nfeItems).values({
           documentId: doc!.id,
           companyId: company.id,
@@ -212,7 +228,7 @@ export async function importNfe(
         action: "NFE_IMPORTED",
         entityType: "nfe_document",
         entityId: doc!.id,
-        metadata: { accessKey: invoice.accessKey, sha256, items: invoice.items.length, pendingItems: pendingCount, warnings: invoice.warnings.length },
+        metadata: { accessKey: invoice.accessKey, sha256, items: invoice.items.length, pendingItems: pendingCount, outOfValidityItems: outOfValidityCount, warnings: invoice.warnings.length },
         ip,
       });
       return { document: finalDoc!, duplicate: false, contentDiffers: false, pendingCount };
