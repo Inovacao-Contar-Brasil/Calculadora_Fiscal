@@ -13,6 +13,7 @@
     "dev:web": "npm run dev --workspace apps/web",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "vitest run",
+    "test:mutations": "npm run test:mutations --workspace apps/api",
     "build": "npm run build --workspaces --if-present",
     "db:generate": "npm run db:generate --workspace apps/api",
     "db:check": "npm run db:check --workspace apps/api",
