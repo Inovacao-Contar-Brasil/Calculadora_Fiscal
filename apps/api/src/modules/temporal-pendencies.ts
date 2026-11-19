@@ -173,7 +173,10 @@ export async function temporalPendencyRoutes(fastify: FastifyInstance): Promise<
     const created = await app.db.transaction(async (tx) => {
       // Mesmo lock de decisões, reaberturas e importações do produto: a linha do
       // tempo lida aqui não muda até o commit.
-      await lockOpenReview(tx, row.companyId, row.fingerprint);
+      // Se uma reabertura concorrente encerrou o item aberto enquanto esperávamos, o
+      // FOR UPDATE não devolve linha (a versão nova não casa mais) e não há lock: conflito.
+      const open = await lockOpenReview(tx, row.companyId, row.fingerprint);
+      if (!open) throw conflict("A decisão foi alterada por outra pessoa. Recarregue e tente novamente.");
       const timeline = await loadTimeline(tx, row.companyId, row.fingerprint);
       const current = timeline.find((r) => r.id === row.id);
       if (!current || current.validFrom !== row.validFrom || current.validTo !== row.validTo) {
