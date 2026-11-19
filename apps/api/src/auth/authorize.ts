@@ -79,3 +79,25 @@ export async function listVisibleCompanies(db: Database, principal: Principal): 
     .where(conditions.length === 1 ? conditions[0] : or(...conditions))
     .orderBy(companies.legalName);
 }
+
+/**
+ * Empresas cujo fluxo INTERNO (fila de revisão, pendências temporais) o
+ * principal pode ler: só as de organizações em que ele é staff. Um usuário
+ * pode ser fiscal numa organização e cliente em outra.
+ *
+ * Com `companyId`: fora do escopo = 404 (sem revelar existência); cliente com
+ * acesso à empresa = 403. Sem `companyId` e sem papel staff em nenhuma
+ * organização = 403.
+ */
+export async function staffCompanyScope(db: Database, principal: Principal, companyId?: string): Promise<string[]> {
+  const staffOrgs = new Set(principal.memberships.filter((m) => isStaff(m.role)).map((m) => m.organizationId));
+  const visible = await listVisibleCompanies(db, principal);
+  const staffCompanies = visible.filter((c) => staffOrgs.has(c.organizationId)).map((c) => c.id);
+  if (companyId) {
+    if (!visible.some((c) => c.id === companyId)) throw notFound("Empresa não encontrada.");
+    if (!staffCompanies.includes(companyId)) throw forbidden();
+    return [companyId];
+  }
+  if (staffOrgs.size === 0) throw forbidden();
+  return staffCompanies;
+}

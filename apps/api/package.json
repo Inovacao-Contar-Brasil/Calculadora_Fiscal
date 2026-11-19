@@ -8,6 +8,7 @@
     "start": "node --env-file-if-exists=.env dist/server.js",
     "build": "node scripts/build.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test:mutations": "node scripts/mutation-check.mjs",
     "db:generate": "drizzle-kit generate",
     "db:check": "drizzle-kit check",
     "db:seed": "tsx --env-file-if-exists=.env src/db/seed.ts"

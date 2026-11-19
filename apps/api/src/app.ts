@@ -12,6 +12,7 @@ import { companyRoutes } from "./modules/companies.ts";
 import { documentRoutes } from "./modules/documents.ts";
 import { fiscalProfileRoutes } from "./modules/fiscal-profiles.ts";
 import { reviewRoutes } from "./modules/review.ts";
+import { temporalPendencyRoutes } from "./modules/temporal-pendencies.ts";
 
 export interface AppDeps {
   db: Database;
@@ -102,6 +103,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   await app.register(fiscalProfileRoutes);
   await app.register(documentRoutes);
   await app.register(reviewRoutes);
+  await app.register(temporalPendencyRoutes);
 
   // Opcional: servir o build do frontend no mesmo origin (SPA com fallback para index.html).
   const serveWeb = !!deps.config.WEB_DIST_DIR;

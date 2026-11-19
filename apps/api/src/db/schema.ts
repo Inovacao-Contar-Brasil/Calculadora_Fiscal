@@ -3,6 +3,7 @@ import {
   bigint,
   boolean,
   char,
+  check,
   date,
   index,
   integer,
@@ -191,13 +192,23 @@ export const nfeItems = pgTable(
     classificationStatus: classificationStatusEnum("classification_status").notNull().default("PENDENTE_REVISAO"),
     reviewItemId: uuid("review_item_id"),
   },
-  (t) => [index("nfe_items_document_idx").on(t.documentId), index("nfe_items_company_fingerprint_idx").on(t.companyId, t.fingerprint)],
+  (t) => [
+    index("nfe_items_document_idx").on(t.documentId),
+    index("nfe_items_company_fingerprint_idx").on(t.companyId, t.fingerprint),
+    // Vínculo item → decisão: propagação, reabertura e projeção de pendências temporais.
+    index("nfe_items_review_item_idx").on(t.reviewItemId),
+  ],
 );
 
 /**
  * Produto pendente de classificação tributária (fila do Fiscal). Um por
  * (empresa, fingerprint) enquanto vigente; a decisão homologada é a "memória"
  * reaproveitada em importações futuras até ser encerrada por `valid_to`.
+ *
+ * As linhas de um mesmo produto formam a linha do tempo de decisões (ADR-008):
+ * decisões finais encerradas por reabertura ou registradas para um período
+ * anterior (resolução de pendência temporal) têm vigências disjuntas, e cada
+ * item de NF-e se vincula à decisão que cobre a sua emissão.
  */
 export const reviewItems = pgTable(
   "review_items",
@@ -227,6 +238,7 @@ export const reviewItems = pgTable(
   (t) => [
     uniqueIndex("review_items_open_idx").on(t.companyId, t.fingerprint).where(sql`${t.validTo} is null`),
     index("review_items_org_status_idx").on(t.organizationId, t.status),
+    check("review_items_vigencia_ordenada_chk", sql`${t.validFrom} is null or ${t.validTo} is null or ${t.validFrom} <= ${t.validTo}`),
   ],
 );
 

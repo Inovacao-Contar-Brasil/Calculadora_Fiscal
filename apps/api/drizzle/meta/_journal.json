@@ -8,6 +8,20 @@
       "when": 1794580964727,
       "tag": "0000_fundacao",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1795090619177,
+      "tag": "0001_temporal_pendencias",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795094504588,
+      "tag": "0002_rejeicao_fora_da_vigencia",
+      "breakpoints": true
     }
   ]
 }

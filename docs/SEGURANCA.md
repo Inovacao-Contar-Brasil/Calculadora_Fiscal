@@ -24,9 +24,11 @@ Documento de trabalho da Sprint 1. Complementa as ADRs 002, 003 e 005.
 |---|---|---|
 | Acesso sem login | `requireAuth` em todas as rotas de negócio; 401 | `auth.test.ts` |
 | Cliente A lê dados de B (listagem ou por ID) | escopo por empresa em toda consulta; 404 fora do escopo | `isolation.test.ts` |
-| Cliente altera cadastro fiscal / decide revisão | `loadCompanyForStaff` / `loadReviewForStaff` → 403 (escopo verificado **antes** do papel: sem acesso à empresa = 404) | `isolation.test.ts` |
-| Oráculo de existência por ID | fora do escopo responde o mesmo corpo de inexistente (`asNotFound`) em documento, XML e item de revisão | `isolation.test.ts` |
+| Cliente altera cadastro fiscal / decide revisão / lê ou resolve pendência temporal | `loadCompanyForStaff` / `loadReviewForStaff` / `staffCompanyScope` → 403 (escopo verificado **antes** do papel: sem acesso à empresa = 404) | `isolation.test.ts` |
+| Oráculo de existência por ID | fora do escopo responde o mesmo corpo de inexistente (`asNotFound`) em documento, XML, item de revisão e pendência temporal | `isolation.test.ts` |
 | Decisões concorrentes / reabertura dupla | atualização condicional ao status lido (concorrência otimista) → 409 | `review-consistency.test.ts` |
+| Decisões de vigência sobrepostas (resolução, reabertura, importação simultâneas) | lock da linha aberta do produto (`lockOpenReview` / UPSERT) + validação de vigências disjuntas → 409/422 (ADR-008) | `temporal-pendencies.test.ts` (PostgreSQL real); `npm run test:mutations` (M1 sem lock é detectada) |
+| Decisão fiscal atribuída fora da vigência / pendência omitida na visão administrativa | toda decisão final vale só na vigência (`classificationFor`); projeção inclui rejeições; lacunas calculadas sobre todas as notas, ocorrências paginadas com total (ADR-008, R2) | `temporal-pendencies-r2.test.ts`, mutações M5–M7 |
 | Status de classificação contraditório | regra única `classificationFor` na importação e na propagação; homologação só dentro da vigência | `classification.test.ts`, `review-consistency.test.ts` |
 | Cliente importa nota de terceiro para si | CNPJ do destinatário deve ser o da empresa → 422 | `documents.test.ts` |
 | Roubo de sessão via XSS | cookie `HttpOnly`; CSP `script-src 'self'`; React escapa saída | manual (headers) |
