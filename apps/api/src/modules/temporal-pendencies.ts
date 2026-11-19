@@ -49,7 +49,7 @@ type ReasonCode = "EMISSAO_ANTERIOR_A_VIGENCIA" | "EMISSAO_POSTERIOR_A_VIGENCIA"
 function reasonOf(review: ReviewRow, origin: Origin): { reasonCode: ReasonCode; reason: string } {
   const notes = origin.items === 1 ? "Nota emitida" : origin.items + " notas emitidas";
   const decision = review.status === "REJEITADO" ? "da rejeição registrada" : "da classificação homologada";
-  const tail = " " + decision + "; a decisão não as cobre e nenhuma decisão foi registrada para esse período.";
+  const tail = " " + decision + "; a decisão não " + (origin.items === 1 ? "a cobre" : "as cobre") + " e nenhuma decisão foi registrada para esse período.";
   if (review.validFrom && origin.lastIssueDate < review.validFrom) {
     return { reasonCode: "EMISSAO_ANTERIOR_A_VIGENCIA", reason: notes + " antes do início da vigência (" + review.validFrom + ")" + tail };
   }
