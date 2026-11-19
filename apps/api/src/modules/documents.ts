@@ -13,7 +13,7 @@ import { AppError, asNotFound, badRequest, notFound, unprocessable } from "../er
 
 const DOCUMENT_NOT_FOUND = "Documento não encontrado.";
 import { clientIp, idParams, requireAuth } from "../http.ts";
-import { classificationFor, issueDateOf, selectReviewFor } from "./classification.ts";
+import { classificationFor, isFinalDecision, issueDateOf, selectReviewFor } from "./classification.ts";
 
 type DocumentRow = typeof nfeDocuments.$inferSelect;
 type ItemRow = typeof nfeItems.$inferSelect;
@@ -189,8 +189,8 @@ export async function importNfe(
         const review = selectReviewFor(open, closedRows.filter((row) => row.fingerprint === fingerprint), issueDate);
         const status = classificationFor(review, issueDate);
         if (status !== "HOMOLOGADO") pendingCount += 1;
-        // Homologação que não cobre a emissão: a nota entra na pendência temporal.
-        if (status === "PENDENTE_REVISAO" && review.status === "HOMOLOGADO") outOfValidityCount += 1;
+        // Decisão final (homologação ou rejeição) que não cobre a emissão: pendência temporal.
+        if (status === "PENDENTE_REVISAO" && isFinalDecision(review)) outOfValidityCount += 1;
         await tx.insert(nfeItems).values({
           documentId: doc!.id,
           companyId: company.id,

@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { and, eq } from "drizzle-orm";
+import { readFileSync } from "node:fs";
+import { and, eq, sql } from "drizzle-orm";
 import { auditEvents, nfeDocuments, nfeItems, reviewItems } from "../db/schema.ts";
 import { createHarness, TEST_PASSWORD, type Harness } from "../test/harness.ts";
 import { syntheticCnpj, syntheticNfe, type SyntheticItem } from "../test/fixtures.ts";
@@ -197,6 +198,37 @@ describe("auditoria R2: rejeição fora da vigência e pendências volumosas", (
     expect(await itemOf(oct)).toMatchObject({ item: { classificationStatus: "REJEITADO" } });
     // Nota mais antiga importada depois: coberta pela vigência registrada (sem início), como se viesse antes.
     expect(await itemOf(await importNote("2302", "2026-08-10T10:00:00-03:00", item))).toMatchObject({ item: { classificationStatus: "REJEITADO", reviewItemId: id } });
+    await assertTimelineInvariants(companyA.id, item.description);
+  });
+
+  it("P1: migração 0002 corrige rejeições antigas gravadas fora da vigência, de forma idempotente e auditada", async () => {
+    const item = product("RJ-05", "VALVULA SINTETICA REJEICAO LEGADA", "84818099");
+    const oct = await importNote("2501", "2026-10-10T10:00:00-03:00", item);
+    const id = (await itemOf(oct)).item.reviewItemId as string;
+    expect((await rejeitar(id, "2026-11-01")).status).toBe(200);
+    const nov = await importNote("2502", "2026-11-10T10:00:00-03:00", item);
+    // Simula o estado gravado pela regra antiga: outubro marcado REJEITADO sem cobertura.
+    const octItemId = (await itemOf(oct)).item.id as string;
+    await h.db.update(nfeItems).set({ classificationStatus: "REJEITADO" }).where(eq(nfeItems.id, octItemId));
+    expect((await pendencies()).body.items.map((p: { id: string }) => p.id)).not.toContain(id);
+
+    const statements = readFileSync(new URL("../../drizzle/0002_rejeicao_fora_da_vigencia.sql", import.meta.url), "utf8").split("--> statement-breakpoint");
+    const run = async () => {
+      for (const statement of statements) if (statement.trim()) await h.db.execute(sql.raw(statement));
+    };
+    await run();
+    expect(await itemOf(oct)).toMatchObject({ item: { classificationStatus: "PENDENTE_REVISAO", reviewItemId: id }, status: "COM_PENDENCIAS" });
+    // Rejeição dentro da vigência preservada; a nota volta a ser tratável.
+    expect(await itemOf(nov)).toMatchObject({ item: { classificationStatus: "REJEITADO", reviewItemId: id } });
+    expect((await pendencies()).body.items.map((p: { id: string }) => p.id)).toContain(id);
+    const migrationEvents = () =>
+      h.db.select().from(auditEvents).where(and(eq(auditEvents.action, "MIGRATION_REJECTION_OUT_OF_VALIDITY_RECLASSIFIED"), eq(auditEvents.companyId, companyA.id)));
+    const events = await migrationEvents();
+    expect(events).toHaveLength(1);
+    expect(events[0]!.metadata).toMatchObject({ migration: "0002_rejeicao_fora_da_vigencia", items: 1, itemIds: [octItemId] });
+    // Reexecutar não altera nada nem duplica auditoria.
+    await run();
+    expect(await migrationEvents()).toHaveLength(1);
     await assertTimelineInvariants(companyA.id, item.description);
   });
 

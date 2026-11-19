@@ -7,6 +7,8 @@ export interface ReviewDecisionState {
   validTo: string | null;
 }
 
+const FINAL: ReadonlySet<ClassificationStatus> = new Set(["HOMOLOGADO", "REJEITADO"]);
+
 /**
  * Regra ÚNICA que diz qual classificação um item de NF-e recebe a partir do
  * item de revisão ao qual está vinculado (ver `selectReviewFor`). Usada na
@@ -16,22 +18,22 @@ export interface ReviewDecisionState {
  *
  * - Sem item de revisão: PENDENTE_REVISAO.
  * - PENDENTE_REVISAO / EM_ANALISE: estado de fluxo, vale para todos os itens.
- * - REJEITADO: vale para todos os itens vinculados (é o lado seguro; nunca libera valor).
- * - HOMOLOGADO: só para notas emitidas dentro de [validFrom, validTo]
- *   (datas YYYY-MM-DD, inclusivas). Fora da vigência: PENDENTE_REVISAO — uma
- *   homologação com início em dezembro não homologa nota de outubro, e uma
- *   decisão encerrada por mudança legal não cobre notas posteriores. Essas
- *   notas formam a pendência temporal (`temporal-pendencies.ts`).
+ * - Decisão final (HOMOLOGADO ou REJEITADO): só para notas emitidas dentro de
+ *   [validFrom, validTo] (datas YYYY-MM-DD, inclusivas; null = sem limite).
+ *   Fora da vigência: PENDENTE_REVISAO — uma homologação com início em
+ *   dezembro não homologa nota de outubro, uma rejeição com início em
+ *   novembro não rejeita nota de outubro, e uma decisão encerrada por mudança
+ *   legal não cobre notas posteriores. Essas notas formam a pendência
+ *   temporal (`temporal-pendencies.ts`). Antes, REJEITADO ignorava a vigência
+ *   e atribuía rejeição a notas que nenhuma decisão cobria (auditoria do PR
+ *   #10, P1) — comportamento conservador provisório; a semântica de vigência
+ *   da rejeição é decisão pendente do Fiscal (ADR-008).
  */
 export function classificationFor(review: ReviewDecisionState | undefined, issueDate: string): ClassificationStatus {
   if (!review) return "PENDENTE_REVISAO";
-  if (review.status !== "HOMOLOGADO") return review.status;
-  const startsBefore = !review.validFrom || review.validFrom <= issueDate;
-  const endsAfter = !review.validTo || review.validTo >= issueDate;
-  return startsBefore && endsAfter ? "HOMOLOGADO" : "PENDENTE_REVISAO";
+  if (!isFinalDecision(review)) return review.status;
+  return decisionCovers(review, issueDate) ? review.status : "PENDENTE_REVISAO";
 }
-
-const FINAL: ReadonlySet<ClassificationStatus> = new Set(["HOMOLOGADO", "REJEITADO"]);
 
 export function isFinalDecision(review: Pick<ReviewDecisionState, "status">): boolean {
   return FINAL.has(review.status);
@@ -106,9 +108,31 @@ export function periodContains(period: Period, date: string): boolean {
   return (period.from === null || period.from <= date) && (period.to === null || period.to >= date);
 }
 
-/** Lacunas de vigência que contêm notas pendentes, com a quantidade de itens em cada uma. */
-export function uncoveredPeriods(decisions: readonly ReviewDecisionState[], pendingIssueDates: readonly string[]): (Period & { items: number })[] {
-  return freePeriods(decisions)
-    .map((period) => ({ ...period, items: pendingIssueDates.filter((date) => periodContains(period, date)).length }))
-    .filter((period) => period.items > 0);
+/** Itens pendentes agregados por data de emissão. */
+export interface PendingDay {
+  issueDate: string;
+  items: number;
+}
+
+export interface UncoveredPeriod extends Period {
+  items: number;
+  firstIssueDate: string;
+  lastIssueDate: string;
+}
+
+/**
+ * Lacunas de vigência que contêm notas pendentes, com a quantidade de itens e
+ * a primeira/última emissão em cada uma. Recebe a agregação COMPLETA por dia
+ * (nunca uma amostra paginada), para não omitir intervalos.
+ */
+export function uncoveredPeriods(decisions: readonly ReviewDecisionState[], pending: readonly PendingDay[]): UncoveredPeriod[] {
+  const result: UncoveredPeriod[] = [];
+  for (const period of freePeriods(decisions)) {
+    const inPeriod = pending.filter((day) => periodContains(period, day.issueDate) && day.items > 0);
+    if (!inPeriod.length) continue;
+    const days = inPeriod.map((day) => day.issueDate).sort();
+    const items = inPeriod.reduce((sum, day) => sum + day.items, 0);
+    result.push({ ...period, items, firstIssueDate: days[0]!, lastIssueDate: days[days.length - 1]! });
+  }
+  return result;
 }

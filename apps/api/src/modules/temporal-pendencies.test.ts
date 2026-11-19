@@ -166,7 +166,8 @@ describe("pendência temporal: NF-e fora da vigência de classificação homolog
     const detail = await h.request({ method: "GET", url: "/api/temporal-pendencies/" + reviewId, cookie: fiscal });
     expect(detail.status).toBe(200);
     expect(detail.body.occurrences.map((o: { documentId: string }) => o.documentId).sort()).toEqual([octoberDoc, septemberDoc].sort());
-    expect(detail.body.uncoveredPeriods).toEqual([{ from: null, to: "2026-10-31", items: 2 }]);
+    expect(detail.body.uncoveredPeriods).toEqual([{ from: null, to: "2026-10-31", items: 2, firstIssueDate: "2026-09-15", lastIssueDate: "2026-10-10" }]);
+    expect(detail.body.page).toEqual({ limit: 100, offset: 0, total: 2, hasMore: false });
   });
 
   it("nota dentro da vigência é homologada e não entra na pendência", async () => {
@@ -229,7 +230,7 @@ describe("pendência temporal: NF-e fora da vigência de classificação homolog
     expect(reopened.body.items).toHaveLength(1);
     expect(reopened.body.items[0]).toMatchObject({ id: reviewId, origin: { items: 1, firstIssueDate: "2026-08-10" } });
     const detail = await h.request({ method: "GET", url: "/api/temporal-pendencies/" + reviewId, cookie: fiscal });
-    expect(detail.body.uncoveredPeriods).toEqual([{ from: null, to: "2026-08-31", items: 1 }]);
+    expect(detail.body.uncoveredPeriods).toEqual([{ from: null, to: "2026-08-31", items: 1, firstIssueDate: "2026-08-10", lastIssueDate: "2026-08-10" }]);
 
     // Sobrepor a decisão do período é conflito; rejeitar o período também é uma resolução válida.
     expect((await resolve(reviewId, periodDecision("2026-08-01", "2026-09-10"))).status).toBe(409);
@@ -330,8 +331,8 @@ describe("pendência temporal: NF-e fora da vigência de classificação homolog
     const detail = await h.request({ method: "GET", url: "/api/temporal-pendencies/" + newId, cookie: fiscal });
     expect(detail.status).toBe(200);
     expect(detail.body.uncoveredPeriods).toEqual([
-      { from: null, to: "2026-10-31", items: 1 },
-      { from: "2027-01-01", to: "2027-01-31", items: 1 },
+      { from: null, to: "2026-10-31", items: 1, firstIssueDate: "2026-10-10", lastIssueDate: "2026-10-10" },
+      { from: "2027-01-01", to: "2027-01-31", items: 1, firstIssueDate: "2027-01-10", lastIssueDate: "2027-01-10" },
     ]);
     // A decisão do período precisa caber numa lacuna, sem invadir a vigência encerrada.
     expect((await resolve(newId, periodDecision("2026-12-01", "2027-01-31"))).status).toBe(409);

@@ -10,10 +10,19 @@ describe("regra única de classificação de item a partir da decisão", () => {
     expect(classificationFor(undefined, "2026-12-10")).toBe("PENDENTE_REVISAO");
   });
 
-  it("estados de fluxo e rejeição valem para qualquer data", () => {
-    for (const status of ["PENDENTE_REVISAO", "EM_ANALISE", "REJEITADO"] as const) {
+  it("estados de fluxo valem para qualquer data", () => {
+    for (const status of ["PENDENTE_REVISAO", "EM_ANALISE"] as const) {
       expect(classificationFor({ status, validFrom: "2026-12-01", validTo: null }, "2020-01-01")).toBe(status);
     }
+  });
+
+  it("rejeição só vale dentro da vigência; fora dela a nota fica pendente (auditoria PR #10, P1)", () => {
+    const rejeitado = { status: "REJEITADO" as const, validFrom: "2026-11-01", validTo: "2026-12-31" };
+    expect(classificationFor(rejeitado, "2026-10-31")).toBe("PENDENTE_REVISAO");
+    expect(classificationFor(rejeitado, "2026-11-01")).toBe("REJEITADO");
+    expect(classificationFor(rejeitado, "2026-12-31")).toBe("REJEITADO");
+    expect(classificationFor(rejeitado, "2027-01-01")).toBe("PENDENTE_REVISAO");
+    expect(classificationFor({ ...rejeitado, validFrom: null, validTo: null }, "1999-01-01")).toBe("REJEITADO");
   });
 
   it("homologação só dentro da vigência, limites inclusivos", () => {
@@ -71,9 +80,14 @@ describe("vínculo temporal: a nota pertence à decisão que cobre a sua emissã
       { from: null, to: "2026-05-31" },
       { from: "2027-01-01", to: null },
     ]);
-    expect(uncoveredPeriods([open, closed, period], ["2026-10-05", "2026-10-20", "2026-01-02"])).toEqual([
-      { from: null, to: "2026-05-31", items: 1 },
-      { from: "2026-10-01", to: "2026-10-31", items: 2 },
+    const pending = [
+      { issueDate: "2026-10-20", items: 3 },
+      { issueDate: "2026-10-05", items: 600 },
+      { issueDate: "2026-01-02", items: 1 },
+    ];
+    expect(uncoveredPeriods([open, closed, period], pending)).toEqual([
+      { from: null, to: "2026-05-31", items: 1, firstIssueDate: "2026-01-02", lastIssueDate: "2026-01-02" },
+      { from: "2026-10-01", to: "2026-10-31", items: 603, firstIssueDate: "2026-10-05", lastIssueDate: "2026-10-20" },
     ]);
   });
 

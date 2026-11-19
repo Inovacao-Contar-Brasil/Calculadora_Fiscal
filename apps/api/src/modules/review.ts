@@ -109,9 +109,9 @@ export async function reviewRoutes(fastify: FastifyInstance): Promise<void> {
       .from(reviewItems)
       .where(and(eq(reviewItems.companyId, company.id), eq(reviewItems.fingerprint, row.fingerprint), sql`${reviewItems.id} <> ${row.id}`))
       .orderBy(desc(reviewItems.createdAt));
-    // Notas vinculadas que a homologação não cobre (pendência temporal, ver /api/temporal-pendencies/:id).
+    // Notas vinculadas que a decisão final não cobre (pendência temporal, ver /api/temporal-pendencies/:id).
     const [outside] =
-      row.status === "HOMOLOGADO"
+      isFinalDecision(row)
         ? await app.db
             .select({ count: sql<number>`count(*)::int` })
             .from(nfeItems)
@@ -161,8 +161,15 @@ export async function reviewRoutes(fastify: FastifyInstance): Promise<void> {
           // aberta vale de validFrom em diante, logo tem de começar depois da última encerrada.
           const lastEnd = latestClosedDecisionEnd(await loadTimeline(tx, row.companyId, row.fingerprint));
           const today = new Date().toISOString().slice(0, 10);
-          validFrom = request.body.validFrom ?? (lastEnd && today <= lastEnd ? shiftDay(lastEnd, 1) : today);
-          if (lastEnd && validFrom <= lastEnd) {
+          if (request.body.validFrom) validFrom = request.body.validFrom;
+          // Rejeição sem data (padrão provisório, decisão pendente do Fiscal — ADR-008): vale para o
+          // período em análise, desde o dia seguinte ao fim da última decisão encerrada (ou sem
+          // início). Não depende da ordem de importação e fica registrada na própria decisão.
+          // Notas de lacunas anteriores continuam pendentes (pendência temporal).
+          else if (request.body.status === "REJEITADO") validFrom = lastEnd ? shiftDay(lastEnd, 1) : null;
+          // Homologação sem data nunca retroage: vale a partir de hoje (ou do dia seguinte ao fim anterior).
+          else validFrom = lastEnd && today <= lastEnd ? shiftDay(lastEnd, 1) : today;
+          if (lastEnd && (validFrom === null || validFrom <= lastEnd)) {
             throw unprocessable("A vigência desta decisão deve começar depois de " + lastEnd + ", fim da decisão anterior deste produto.");
           }
         }
@@ -337,8 +344,8 @@ async function applyReviewToItems(tx: Database, review: ReviewRow): Promise<numb
     }
   }
   await refreshDocumentStatuses(tx, review.id);
-  // Itens que uma homologação deixou fora da vigência: origem de pendência temporal.
-  return review.status === "HOMOLOGADO" ? (byStatus.get("PENDENTE_REVISAO")?.length ?? 0) : 0;
+  // Itens que uma decisão final deixou fora da vigência: origem de pendência temporal.
+  return isFinalDecision(review) ? (byStatus.get("PENDENTE_REVISAO")?.length ?? 0) : 0;
 }
 
 /** Recalcula o status dos documentos que contêm itens ligados ao review item. */

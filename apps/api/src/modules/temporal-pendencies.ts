@@ -14,14 +14,14 @@ import { decisionSchema, loadReviewForStaff, loadTimeline, lockOpenReview, refre
 
 /**
  * Pendência temporal (Issue #8, ADR-008): notas de um produto que ficaram
- * PENDENTE_REVISAO porque foram emitidas fora da vigência da classificação
- * homologada à qual estão vinculadas. A homologação é válida e não é alterada;
- * falta uma decisão para o período das notas.
+ * PENDENTE_REVISAO porque foram emitidas fora da vigência da decisão final
+ * (homologação ou rejeição) à qual estão vinculadas. A decisão é válida e não
+ * é alterada; falta uma decisão para o período das notas.
  *
  * É uma PROJEÇÃO, não uma tabela: deriva do estado autoritativo (itens de NF-e
  * e linha do tempo de decisões), então não duplica com reimportações, não
  * diverge do status das notas e desaparece sozinha quando resolvida. Identidade:
- * a decisão homologada que não cobre as notas (`id` = id do item de revisão).
+ * a decisão final que não cobre as notas (`id` = id do item de revisão).
  * Ação: registrar uma decisão final (homologar ou rejeitar) para um período
  * sem decisão — uma nova versão append-only em `review_items`, nunca uma edição
  * da decisão existente. Somente staff; o cliente continua vendo apenas o
@@ -30,8 +30,11 @@ import { decisionSchema, loadReviewForStaff, loadTimeline, lockOpenReview, refre
 
 const PENDENCY_NOT_FOUND = "Pendência temporal não encontrada.";
 
-/** Item de NF-e pendente vinculado a uma homologação que não cobre a sua emissão. */
-const outOfValidity = and(eq(reviewItems.status, "HOMOLOGADO"), eq(nfeItems.classificationStatus, "PENDENTE_REVISAO"))!;
+/**
+ * Item de NF-e pendente vinculado a uma decisão final (homologação ou rejeição):
+ * pela regra única, só fica pendente se a vigência da decisão não cobre a emissão.
+ */
+const outOfValidity = and(inArray(reviewItems.status, ["HOMOLOGADO", "REJEITADO"]), eq(nfeItems.classificationStatus, "PENDENTE_REVISAO"))!;
 const issueDay = sql<string>`substr(${nfeDocuments.issuedAt}, 1, 10)`;
 
 interface Origin {
@@ -45,7 +48,8 @@ type ReasonCode = "EMISSAO_ANTERIOR_A_VIGENCIA" | "EMISSAO_POSTERIOR_A_VIGENCIA"
 
 function reasonOf(review: ReviewRow, origin: Origin): { reasonCode: ReasonCode; reason: string } {
   const notes = origin.items === 1 ? "Nota emitida" : origin.items + " notas emitidas";
-  const tail = " da classificação homologada; a decisão não as cobre e nenhuma classificação foi homologada para esse período.";
+  const decision = review.status === "REJEITADO" ? "da rejeição registrada" : "da classificação homologada";
+  const tail = " " + decision + "; a decisão não as cobre e nenhuma decisão foi registrada para esse período.";
   if (review.validFrom && origin.lastIssueDate < review.validFrom) {
     return { reasonCode: "EMISSAO_ANTERIOR_A_VIGENCIA", reason: notes + " antes do início da vigência (" + review.validFrom + ")" + tail };
   }
@@ -69,8 +73,8 @@ export const pendencyView = (review: ReviewRow, companyName: string, origin: Ori
 });
 export type PendencyView = ReturnType<typeof pendencyView>;
 
-/** Projeção: uma pendência por decisão homologada com notas pendentes fora da sua vigência. */
-async function listPendencies(db: Database, where: SQL, limit: number): Promise<PendencyView[]> {
+/** Projeção: uma pendência por decisão final com notas pendentes fora da sua vigência. */
+async function listPendencies(db: Database, where: SQL, limit: number, offset = 0): Promise<PendencyView[]> {
   const rows = await db
     .select({
       review: reviewItems,
@@ -87,13 +91,26 @@ async function listPendencies(db: Database, where: SQL, limit: number): Promise<
     .where(and(where, outOfValidity))
     .groupBy(reviewItems.id, companies.legalName)
     .orderBy(desc(sql`max(${nfeDocuments.importedAt})`), reviewItems.id)
-    .limit(limit);
+    .limit(limit)
+    .offset(offset);
   return rows.map((r) => pendencyView(r.review, r.companyName, { items: r.items, documents: r.documents, firstIssueDate: r.firstIssueDate, lastIssueDate: r.lastIssueDate }));
 }
 
 async function loadPendency(db: Database, reviewId: string): Promise<PendencyView | null> {
   return (await listPendencies(db, eq(reviewItems.id, reviewId), 1))[0] ?? null;
 }
+
+/** Total de pendências no escopo (para a listagem nunca truncar em silêncio). */
+async function countPendencies(db: Database, where: SQL): Promise<number> {
+  const [row] = await db
+    .select({ count: sql<number>`count(distinct ${reviewItems.id})::int` })
+    .from(reviewItems)
+    .innerJoin(nfeItems, eq(nfeItems.reviewItemId, reviewItems.id))
+    .where(and(where, outOfValidity));
+  return row?.count ?? 0;
+}
+
+const pageOf = (limit: number, offset: number, total: number) => ({ limit, offset, total, hasMore: offset + limit < total });
 
 const resolveSchema = z
   .object({
@@ -120,43 +137,72 @@ export async function temporalPendencyRoutes(fastify: FastifyInstance): Promise<
         querystring: z.object({
           companyId: z.uuid().optional(),
           limit: z.coerce.number().int().min(1).max(200).default(100),
+          offset: z.coerce.number().int().min(0).default(0),
         }),
       },
     },
     async (request) => {
       const principal = requireAuth(request);
+      const { limit, offset } = request.query;
       const companyIds = await staffCompanyScope(app.db, principal, request.query.companyId);
-      if (!companyIds.length) return { items: [] };
-      return { items: await listPendencies(app.db, inArray(reviewItems.companyId, companyIds), request.query.limit) };
+      if (!companyIds.length) return { items: [], page: pageOf(limit, offset, 0) };
+      const scope = inArray(reviewItems.companyId, companyIds);
+      return { items: await listPendencies(app.db, scope, limit, offset), page: pageOf(limit, offset, await countPendencies(app.db, scope)) };
     },
   );
 
-  app.get("/api/temporal-pendencies/:id", { schema: { params: idParams } }, async (request) => {
+  app.get(
+    "/api/temporal-pendencies/:id",
+    {
+      schema: {
+        params: idParams,
+        querystring: z.object({
+          limit: z.coerce.number().int().min(1).max(500).default(100),
+          offset: z.coerce.number().int().min(0).default(0),
+        }),
+      },
+    },
+    async (request) => {
     const principal = requireAuth(request);
     // Escopo antes do papel; sem pendência = mesmo corpo de inexistente.
     const row = await loadReviewForStaff(app.db, principal, request.params.id, PENDENCY_NOT_FOUND);
     const pendency = await loadPendency(app.db, row.id);
     if (!pendency) throw notFound(PENDENCY_NOT_FOUND);
+    const { limit, offset } = request.query;
+    const pending = and(eq(nfeItems.reviewItemId, row.id), outOfValidity);
+    // Ocorrências paginadas, em ordem estável (emissão, documento, linha, item).
     const occurrences = await app.db
       .select({ nfeItemId: nfeItems.id, documentId: nfeDocuments.id, number: nfeDocuments.number, issuedAt: nfeDocuments.issuedAt, issuerName: nfeDocuments.issuerName, line: nfeItems.line, productCents: nfeItems.productCents })
       .from(nfeItems)
       .innerJoin(nfeDocuments, eq(nfeDocuments.id, nfeItems.documentId))
       .innerJoin(reviewItems, eq(reviewItems.id, nfeItems.reviewItemId))
-      .where(and(eq(nfeItems.reviewItemId, row.id), outOfValidity))
-      .orderBy(nfeDocuments.issuedAt, nfeItems.line)
-      .limit(500);
+      .where(pending)
+      .orderBy(nfeDocuments.issuedAt, nfeDocuments.id, nfeItems.line, nfeItems.id)
+      .limit(limit)
+      .offset(offset);
+    // Lacunas calculadas sobre TODAS as notas pendentes (agregadas por dia), nunca sobre a
+    // página: a visão administrativa não pode omitir intervalos (auditoria do PR #10, P2).
+    const days = await app.db
+      .select({ issueDate: issueDay, items: sql<number>`count(*)::int` })
+      .from(nfeItems)
+      .innerJoin(nfeDocuments, eq(nfeDocuments.id, nfeItems.documentId))
+      .innerJoin(reviewItems, eq(reviewItems.id, nfeItems.reviewItemId))
+      .where(pending)
+      .groupBy(issueDay);
     const timeline = await loadTimeline(app.db, row.companyId, row.fingerprint);
     return {
       pendency,
-      occurrences,
       // Onde uma decisão do período pode ser registrada sem tocar em decisão existente.
-      uncoveredPeriods: uncoveredPeriods(timeline, occurrences.map((o) => issueDateOf(o.issuedAt))),
+      uncoveredPeriods: uncoveredPeriods(timeline, days),
+      occurrences,
+      page: pageOf(limit, offset, pendency.origin.items),
       decisions: timeline
         .filter(isFinalDecision)
         .sort((a, b) => (a.validFrom ?? "").localeCompare(b.validFrom ?? ""))
         .map((d) => ({ id: d.id, status: d.status, validFrom: d.validFrom, validTo: d.validTo })),
     };
-  });
+  },
+  );
 
   /**
    * Resolve a pendência registrando uma decisão final para um período sem
@@ -166,8 +212,8 @@ export async function temporalPendencyRoutes(fastify: FastifyInstance): Promise<
   app.post("/api/temporal-pendencies/:id/resolve", { schema: { params: idParams, body: resolveSchema } }, async (request, reply) => {
     const principal = requireAuth(request);
     const row = await loadReviewForStaff(app.db, principal, request.params.id, PENDENCY_NOT_FOUND);
-    // Só uma homologação pode deixar notas fora da vigência (status final: não muda).
-    if (row.status !== "HOMOLOGADO") throw notFound(PENDENCY_NOT_FOUND);
+    // Só uma decisão final tem vigência e pode deixar notas fora dela (status final: não muda).
+    if (!isFinalDecision(row)) throw notFound(PENDENCY_NOT_FOUND);
     const body = request.body;
 
     const created = await app.db.transaction(async (tx) => {
@@ -191,7 +237,7 @@ export async function temporalPendencyRoutes(fastify: FastifyInstance): Promise<
       const period = { from, to };
       if (overlaps(period, { from: current.validFrom, to: current.validTo })) {
         throw unprocessable(
-          "O período deve ficar fora da vigência da decisão homologada (" + (current.validFrom ?? "…") + " a " + (current.validTo ?? "em aberto") + "), que não é alterada.",
+          "O período deve ficar fora da vigência da decisão que originou a pendência (" + (current.validFrom ?? "sem início") + " a " + (current.validTo ?? "em aberto") + "), que não é alterada.",
         );
       }
       // Vigências de decisões finais são disjuntas: o período inteiro tem de caber numa lacuna.
