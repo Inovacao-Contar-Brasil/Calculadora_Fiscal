@@ -70,8 +70,21 @@ export async function createTestDatabase(adminUrl: string): Promise<TestDatabase
     async drop() {
       if (dropped) return;
       assertTestDatabaseName(name);
-      // WITH (FORCE) (PostgreSQL 13+) encerra conexões remanescentes do próprio teste.
-      await withAdmin(Client, adminUrl, (client) => client.query(`drop database if exists "${name}" with (force)`));
+      await withAdmin(Client, adminUrl, async (client) => {
+        // `pool.end()` do pg resolve quando os clientes saem da lista do pool, ANTES de
+        // o socket fechar. Um DROP ... WITH (FORCE) imediato derruba essas conexões ainda
+        // em encerramento (FATAL 57P01), o pool emite `error` sem ouvinte e o worker do
+        // Vitest morre com exceção não tratada, deixando bancos `cf_test_*` órfãos
+        // (CF-INTEG-01, reproduzido em 1 de 6 execuções da suíte integrada). Espera-se
+        // até ~1 s pelas conexões do próprio teste; FORCE só para o que sobrar.
+        for (let attempt = 0; attempt < 50; attempt++) {
+          const { rows } = await client.query<{ n: number }>("select count(*)::int as n from pg_stat_activity where datname = $1", [name]);
+          if (rows[0]!.n === 0) break;
+          await new Promise((resolve) => setTimeout(resolve, 20));
+        }
+        // WITH (FORCE) (PostgreSQL 13+) encerra conexões remanescentes do próprio teste.
+        await client.query(`drop database if exists "${name}" with (force)`);
+      });
       dropped = true;
       active.delete(name);
     },
