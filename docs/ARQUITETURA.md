@@ -30,7 +30,7 @@ Visão da arquitetura após a Sprint 1. Decisões detalhadas em `docs/adr/`.
 | `fiscal-profiles` | cadastro fiscal versionado com vigência | `GET|POST /api/companies/:id/fiscal-profiles`, `/current?date=`, `/audit` |
 | `documents` | importação de NF-e, histórico, detalhe, XML original | `POST|GET /api/companies/:id/documents`, `GET /api/documents/:id`, `/xml` |
 | `review` | fila de classificação, decisões, memória, reabertura | `GET /api/review-items`, `GET|PATCH /api/review-items/:id`, `POST /api/review-items/:id/reopen` |
-| `temporal-pendencies` | notas fora da vigência da homologação (projeção, staff-only) e decisão do período (ADR-008) | `GET /api/temporal-pendencies`, `GET /api/temporal-pendencies/:id`, `POST /api/temporal-pendencies/:id/resolve` |
+| `temporal-pendencies` | notas fora da vigência da decisão final — homologação ou rejeição (projeção, staff-only, paginada com total) e decisão do período (ADR-008) | `GET /api/temporal-pendencies`, `GET /api/temporal-pendencies/:id`, `POST /api/temporal-pendencies/:id/resolve` |
 
 ## Modelo de dados (resumo)
 

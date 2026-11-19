@@ -16,7 +16,7 @@ Plataforma SaaS da Contar Brasil para consulta tributária por produto a partir 
 6. **Não modifique o Hub Contar Brasil.**
 7. **Não anuncie como pronto o que não foi testado.** Rode `npm run verify` antes de cada commit.
 8. **Atualize `docs/HANDOFF.md`** após cada marco e antes de encerrar a sessão.
-9. **Classificação de item vem só de `classificationFor` e o vínculo item → decisão só de `selectReviewFor`** (`apps/api/src/modules/classification.ts`), na importação, na propagação, na reabertura e na resolução de pendência temporal. Homologação vale só dentro da vigência; vigências de decisões finais do mesmo produto são disjuntas e toda escrita na linha do tempo passa pelo lock do item aberto (`lockOpenReview`/UPSERT) — ADR-008. Nota fora da vigência não é homologada: vira pendência temporal, resolvida por decisão do período, nunca editando a homologação. Classificação homologada **não** autoriza cálculo (ADR-007).
+9. **Classificação de item vem só de `classificationFor` e o vínculo item → decisão só de `selectReviewFor`** (`apps/api/src/modules/classification.ts`), na importação, na propagação, na reabertura e na resolução de pendência temporal. Decisão final (homologação **ou rejeição**) vale só dentro da vigência; vigências de decisões finais do mesmo produto são disjuntas e toda escrita na linha do tempo passa pelo lock do item aberto (`lockOpenReview`/UPSERT) — ADR-008. Nota fora da vigência não é homologada nem rejeitada: vira pendência temporal, resolvida por decisão do período, nunca editando a decisão existente. Mudou algo nessas regras? Rode `npm run test:mutations` (com `TEST_DATABASE_URL` para incluir a concorrência). Classificação homologada **não** autoriza cálculo (ADR-007).
 10. **Testes nunca apagam nada em banco compartilhado.** Os arquivos de teste rodam em paralelo; com `TEST_DATABASE_URL` cada harness cria e remove o próprio banco `cf_test_*` (`apps/api/src/test/pg-test-database.ts`).
 
 ## Estrutura
@@ -51,6 +51,7 @@ npm run verify                   # typecheck + testes + build — obrigatório a
 npm test                         # vitest (projetos "domain" e "api"); API usa PGlite em memória
 TEST_DATABASE_URL=postgres://... npm test -- --project api   # contra PostgreSQL real (URL = conexão admin; requer CREATEDB)
 npm run db:check                 # drizzle-kit check: migrações coerentes (também no CI)
+npm run test:mutations           # mutações das garantias temporais (ADR-008); falha se alguma sobreviver
 npm run dev                      # API (3333) + web (5173, proxy /api) — PGlite em apps/api/.data
 npm run db:generate              # após alterar src/db/schema.ts: gera migração em apps/api/drizzle
 npm run db:seed                  # cria organização e admin a partir de SEED_* (apps/api/.env)

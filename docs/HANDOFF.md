@@ -2,6 +2,48 @@
 
 > Leia junto com `CLAUDE.md`. Atualize este arquivo após cada marco e antes de encerrar a sessão. Não dependa do histórico de nenhuma conversa: tudo o que importa está aqui, nos commits e nas Issues.
 
+## Atualização 19/11/2026 (tarde) — CF-FOUND-08-R2: achados P1 e P2 da auditoria do PR #10
+
+- **Branch:** `feat/cf-found-08-temporal` (a mesma do PR #10; base `feat/sprint1-fundacao-segura`). Auditoria em [comentário do PR #10](https://github.com/Inovacao-Contar-Brasil/Calculadora_Fiscal/pull/10#issuecomment-7010097493) sobre `d22f3b2`. Sem merge, sem force push; `main`, PR #7, PR #9 e Premium não foram tocados.
+- **Commits R2:**
+
+| Commit | O quê | CI (push) |
+|---|---|---|
+| `1e89db6` | test: reprodução de P1 e P2 — 5 casos falham contra `d22f3b2` (intencional) | [44532247334](https://github.com/Inovacao-Contar-Brasil/Calculadora_Fiscal/actions/runs/44532247334) **vermelho no passo de testes PGlite** (esperado) |
+| `2a03068` | fix(review): toda decisão final só vale na vigência; projeção/resolução incluem rejeição; padrão da rejeição sem data; migração `0002`; lacunas sobre agregação completa; paginação com total | (incluído no run abaixo) |
+| `1429005` | test(review): `npm run test:mutations` (M1–M7) | (incluído no run abaixo) |
+| `2f21ee5` | feat(web): rejeição com vigência opcional; textos e lacunas completas | [44533633315](https://github.com/Inovacao-Contar-Brasil/Calculadora_Fiscal/actions/runs/44533633315) verde |
+| `8e91402` | fix(review): concordância do motivo com uma nota | ver Actions |
+| (este) | docs: ADR-008 (R2, decisões pendentes), HANDOFF, CLAUDE.md, SEGURANCA, ARQUITETURA | ver Actions / PR #10 |
+
+- **P1, causa raiz confirmada:** `classificationFor` devolvia `REJEITADO` para qualquer data. A nota de outubro sob rejeição a partir de novembro ficava rejeitada sem cobertura e sem ação, porque a projeção só via `HOMOLOGADO`.
+  - **Correção:** toda decisão final vale só na vigência; fora dela, `PENDENTE_REVISAO` e pendência temporal tratável (projeção, resolução e contagem incluem rejeição).
+  - **Rejeição sem data** vale para o período em análise: do fim da decisão anterior em diante, ou sem início. É padrão provisório (D2).
+  - **Migração de dados `0002`** (conservadora, auditada, idempotente) corrige rejeições antigas gravadas fora da vigência.
+- **P2, causa raiz confirmada:** o detalhe truncava em 500 e derivava as lacunas da amostra. Com 520 + 5 notas, sumia o intervalo de maio a junho.
+  - **Correção:** lacunas calculadas sobre a agregação completa por dia, com quantidade e primeira/última emissão; ocorrências paginadas (1–500, padrão 100) em ordem estável, com `page.total`/`hasMore`; listagem também com total.
+- **Decisões pendentes do Fiscal (Iza/Edson), ADR-008:**
+  - D1: rejeição tem vigência?
+  - D2: vigência padrão da rejeição sem data.
+  - D3: decisão do período.
+  - D4: reabertura de rejeição com início definido.
+
+  O implementado é o lado conservador. Não presumir aprovação.
+- **Verificação local (Linux, Node 22.23, PostgreSQL 16.15):**
+  - `npm run verify` verde (PGlite: 93 + 1 só-PostgreSQL);
+  - PostgreSQL real 81/81 em 3 execuções seguidas, sem `cf_test_*` remanescente;
+  - `db:check` ok; `npm audit --omit=dev --audit-level=high` 0 vulnerabilidades;
+  - `npm run test:mutations`: 7/7 detectadas no PostgreSQL, 6/6 no PGlite (M1 exige PostgreSQL);
+  - upgrade `0001` → `0002` com dados legados conferido com o migrator do Drizzle.
+- **Navegador:** teste de fumaça (Playwright, PGlite isolado, dados sintéticos). A rejeição a partir de novembro é feita pela UI, outubro aparece como pendência, é resolvido pela UI e a rejeição original fica intacta.
+- **Atenção ao ambiente:** se o contêiner for reciclado, o PostgreSQL local para (`ECONNREFUSED`). Rode `service postgresql start` antes do `TEST_DATABASE_URL=…`.
+- **Próxima ação exata:**
+  1. Revisão independente atualizada do PR #10, conferindo o CI do último SHA.
+  2. Iza/Edson decidirem D1–D4. Se D1 = "rejeição sem vigência", reverter M5/I3 para rejeições, de forma explícita.
+  3. Seguir os gates do PR #7.
+
+  Nada de merge nem de fechar a Issue #8 antes disso.
+
 ## Atualização 19/11/2026 — CF-FOUND-08-TEMPORAL (Issue #8, achado 2)
 
 - **Branch:** `feat/cf-found-08-temporal`, criada de `70c5c17` (HEAD da fundação). **PR:** [Inovacao-Contar-Brasil/Calculadora_Fiscal#10](https://github.com/Inovacao-Contar-Brasil/Calculadora_Fiscal/pull/10), **draft**, base `feat/sprint1-fundacao-segura` (depende do PR #7). Sem merge; entra na fundação só após revisão independente.
