@@ -180,7 +180,9 @@ export interface TemporalPendency {
 export interface TemporalPendencyDetail {
   pendency: TemporalPendency;
   occurrences: { nfeItemId: string; documentId: string; number: string; issuedAt: string; issuerName: string; line: number; productCents: number }[];
-  uncoveredPeriods: { from: string | null; to: string | null; items: number }[];
+  /** Calculadas sobre todas as notas pendentes (não sobre a página de ocorrências). */
+  uncoveredPeriods: { from: string | null; to: string | null; items: number; firstIssueDate: string; lastIssueDate: string }[];
+  page: { limit: number; offset: number; total: number; hasMore: boolean };
   decisions: { id: string; status: ClassificationStatus; validFrom: string | null; validTo: string | null }[];
 }
 

@@ -14,7 +14,7 @@ export function ReviewQueuePage() {
   if (companyId) query.set("companyId", companyId);
   if (status) query.set("status", status);
   const list = useLoad(() => api<{ items: ReviewItem[] }>("/api/review-items?" + query.toString()), [companyId, status]);
-  const temporal = useLoad(() => api<{ items: TemporalPendency[] }>("/api/temporal-pendencies" + (companyId ? "?companyId=" + companyId : "")), [companyId]);
+  const temporal = useLoad(() => api<{ items: TemporalPendency[]; page: { total: number } }>("/api/temporal-pendencies" + (companyId ? "?companyId=" + companyId : "")), [companyId]);
 
   return (
     <>
@@ -43,18 +43,18 @@ export function ReviewQueuePage() {
       {temporal.data && temporal.data.items.length > 0 && (
         <section className="tablecard">
           <div className="tablehead">
-            <h3>Notas fora da vigência da homologação</h3>
-            <p>A classificação homologada é válida, mas não cobre a data de emissão destas notas. Elas seguem pendentes até uma decisão para o período; a homologação existente não é alterada.</p>
+            <h3>Notas fora da vigência da decisão</h3>
+            <p>A decisão registrada (homologação ou rejeição) é válida, mas não cobre a data de emissão destas notas. Elas seguem pendentes até uma decisão para o período; a decisão existente não é alterada. {temporal.data.page.total > temporal.data.items.length ? "Exibindo " + temporal.data.items.length + " de " + temporal.data.page.total + " pendências." : ""}</p>
           </div>
           <div className="tablewrap">
             <table className="compact">
-              <thead><tr><th>Produto</th><th>Empresa</th><th>Homologação vigente</th><th>Notas pendentes</th><th>Emissões</th></tr></thead>
+              <thead><tr><th>Produto</th><th>Empresa</th><th>Decisão vigente</th><th>Notas pendentes</th><th>Emissões</th></tr></thead>
               <tbody>
                 {temporal.data.items.map((p) => (
                   <tr key={p.id} className="clickable" onClick={() => navigate("/revisao/" + p.id)}>
                     <td><strong>{p.product.description}</strong><small>{p.reason}</small></td>
                     <td>{p.companyName}</td>
-                    <td>{formatDate(p.decision.validFrom)} → {p.decision.validTo ? formatDate(p.decision.validTo) : "em aberto"}</td>
+                    <td><ClassificationBadge status={p.decision.status} /><small>{p.decision.validFrom ? formatDate(p.decision.validFrom) : "sem início"} → {p.decision.validTo ? formatDate(p.decision.validTo) : "em aberto"}</small></td>
                     <td>{p.origin.items} item(ns) em {p.origin.documents} NF-e</td>
                     <td>{formatDate(p.origin.firstIssueDate)} a {formatDate(p.origin.lastIssueDate)}</td>
                   </tr>
@@ -113,12 +113,11 @@ function TemporalPendencyCard({ id, onResolved }: { id: string; onResolved: () =
   const [form, setForm] = useState({ status: "HOMOLOGADO" as "HOMOLOGADO" | "REJEITADO", validFrom: "", validTo: "", enquadramento: "", fundamentoLegal: "", observacoes: "", justification: "" });
   if (loading) return <Loading />;
   if (error || !data) return <ErrorBox error={error} />;
-  const { pendency, occurrences, uncoveredPeriods } = data;
+  const { pendency, uncoveredPeriods, page } = data;
 
-  function choose(period: { from: string | null; to: string | null }) {
-    const first = occurrences.map((o) => o.issuedAt.slice(0, 10)).filter((d) => (!period.from || d >= period.from) && (!period.to || d <= period.to)).sort()[0] ?? "";
-    // Lacuna sem início definido: sugere o primeiro dia do mês da nota mais antiga (editável).
-    setForm({ ...form, validFrom: period.from ?? (first ? first.slice(0, 8) + "01" : ""), validTo: period.to ?? "" });
+  function choose(period: TemporalPendencyDetail["uncoveredPeriods"][number]) {
+    // Lacuna sem início definido: sugere o primeiro dia do mês da nota mais antiga da lacuna (editável).
+    setForm({ ...form, validFrom: period.from ?? period.firstIssueDate.slice(0, 8) + "01", validTo: period.to ?? "" });
     setOpen(true);
   }
   async function onSubmit(event: FormEvent) {
@@ -150,7 +149,7 @@ function TemporalPendencyCard({ id, onResolved }: { id: string; onResolved: () =
     <div className="card form">
       <div className="section-label">Pendência temporal</div>
       <Notice tone="warning">{pendency.reason}</Notice>
-      <p className="muted">Períodos sem decisão com notas pendentes: {uncoveredPeriods.map((p) => (p.from ? formatDate(p.from) : "antes") + " → " + (p.to ? formatDate(p.to) : "em aberto") + " (" + p.items + ")").join(" · ")}</p>
+      <p className="muted">{page.total} nota(s) pendente(s). Períodos sem decisão: {uncoveredPeriods.map((p) => (p.from ? formatDate(p.from) : "antes") + " → " + (p.to ? formatDate(p.to) : "em aberto") + " (" + p.items + " nota(s), emitidas de " + formatDate(p.firstIssueDate) + " a " + formatDate(p.lastIssueDate) + ")").join(" · ")}</p>
       {!open && (
         <div className="actions">
           {uncoveredPeriods.map((p) => (
@@ -190,7 +189,7 @@ export function ReviewDetailPage({ id }: { id: string }) {
   const [mode, setMode] = useState<"none" | "homologar" | "rejeitar" | "reabrir">("none");
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<unknown>(null);
-  const [form, setForm] = useState({ enquadramento: "", fundamentoLegal: "", observacoes: "", justification: "", validFrom: new Date().toISOString().slice(0, 10), validTo: "", reason: "" });
+  const [form, setForm] = useState({ enquadramento: "", fundamentoLegal: "", observacoes: "", justification: "", validFrom: new Date().toISOString().slice(0, 10), rejectFrom: "", validTo: "", reason: "" });
 
   if (loading) return <Loading />;
   if (error || !data) return <ErrorBox error={error ?? new Error("Item não encontrado.")} />;
@@ -219,7 +218,7 @@ export function ReviewDetailPage({ id }: { id: string }) {
   }
   function onRejeitar(event: FormEvent) {
     event.preventDefault();
-    void run(() => patch({ status: "REJEITADO", justification: form.justification }));
+    void run(() => patch({ status: "REJEITADO", justification: form.justification, validFrom: form.rejectFrom || undefined }));
   }
   function onReabrir(event: FormEvent) {
     event.preventDefault();
@@ -252,6 +251,7 @@ export function ReviewDetailPage({ id }: { id: string }) {
           <p className="muted">Vigência {formatDate(item.validFrom)} → {item.validTo ? formatDate(item.validTo) : "em aberto"} · decidido em {formatDateTime(item.decidedAt)}</p>
         </div>
       )}
+      {item.status === "REJEITADO" && <p className="muted">Rejeição com vigência {item.validFrom ? formatDate(item.validFrom) : "sem início"} → {item.validTo ? formatDate(item.validTo) : "em aberto"} · decidida em {formatDateTime(item.decidedAt)}</p>}
       {item.justification && <Notice><strong>Justificativa:</strong> {item.justification}</Notice>}
       {outOfValidityItems > 0 && <TemporalPendencyCard id={item.id} onResolved={reload} />}
 
@@ -282,6 +282,8 @@ export function ReviewDetailPage({ id }: { id: string }) {
       {mode === "rejeitar" && (
         <form className="card form" onSubmit={onRejeitar}>
           <h3>Rejeitar</h3>
+          <p className="muted">A rejeição vale só dentro da vigência. Sem data, vale para todo o período em análise (desde o fim da decisão anterior deste produto, ou sem início); notas fora da vigência ficam pendentes para decisão do período.</p>
+          <label>Vigência a partir de (opcional)<input type="date" value={form.rejectFrom} onChange={(e) => setForm({ ...form, rejectFrom: e.target.value })} /></label>
           <label>Justificativa<textarea rows={3} value={form.justification} onChange={(e) => setForm({ ...form, justification: e.target.value })} required /></label>
           <div className="actions"><button type="submit" className="button danger" disabled={busy}>Confirmar rejeição</button><button type="button" className="button secondary" onClick={() => setMode("none")}>Cancelar</button></div>
         </form>
