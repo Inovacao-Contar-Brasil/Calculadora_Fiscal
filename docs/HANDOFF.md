@@ -2,6 +2,46 @@
 
 > Leia junto com `CLAUDE.md`. Atualize este arquivo após cada marco e antes de encerrar a sessão. Não dependa do histórico de nenhuma conversa: tudo o que importa está aqui, nos commits e nas Issues.
 
+## Atualização 19/11/2026 (noite) — CF-INTEG-01: pré-integração fundação + temporal + catálogo (branch EXPERIMENTAL)
+
+- **Branch:** `feat/cf-integ-temporal-catalogo-preflight`, criada de `20d7d33` (HEAD do PR #10) num worktree isolado. Os 4 commits do PR #9 (`31e272d`) entraram por `cherry-pick -x`, simulando o rebase do PR #9 sobre a fundação já com o PR #10.
+  - **Sem PR e sem merge.** `main`, PR #7 (`70c5c17`), PR #9 (`31e272d`), PR #10 (`20d7d33`) e Premium não foram tocados.
+  - Esta branch serve de evidência e **não deve ser mergeada**.
+- **Relatório completo:** `docs/INTEGRACAO_CF-INTEG-01.md`. Procedimento de migrações: `docs/MIGRACOES.md`. Decisão: ADR-009 (proposta).
+- **Histórico canônico provisório:** 0000 fundação, 0001 temporal, 0002 rejeição, 0003 catálogo, 0004 integridade do catálogo.
+  - A 0003 foi regerada pelo `drizzle-kit` e saiu byte a byte igual à 0001 do PR #9. A 0004 tem o conteúdo exato da 0002 do PR #9.
+  - SQL de 0000–0002 inalterado; `when` crescente.
+- **Bloqueio estrutural encontrado (P1-INT, agora com causa demonstrada):** o migrator do Drizzle decide só pelo `created_at` do último registro.
+  - Renomear sem regerar faz o banco **pular o catálogo em silêncio**.
+  - Um banco com o histórico do PR #9 falha ao reaplicá-lo.
+  - **Correção:** guarda em `migrate()` (`migration-history.ts`), que recusa histórico não canônico sem escrever nada, e `npm run db:reconcile` (dry-run padrão), transacional e auditado.
+- **Conflitos:**
+  - journal e snapshots;
+  - `app.ts` (dois módulos de rotas);
+  - `guards.test.ts` e `catalog-schema.test.ts` (conflitos *semânticos*: nomes fixos de migração e contagem);
+  - CLAUDE.md, HANDOFF, SEGURANCA, CATALOGO_LEGAL.
+
+  Os exclusivos do PR #10 estão idênticos; nada foi removido.
+- **Commits:** `29fc526`, `487ee05`, `79ada6a`, `6b769c1` (cherry-picks); `a525baf` (corrida no `drop()` dos testes); `623be5c` (guarda, reconciliação, testes de migração, H1–H7); `bdd7b1d` (coexistência); seguinte (docs). CI do `623be5c`: [44565968535](https://github.com/Inovacao-Contar-Brasil/Calculadora_Fiscal/actions/runs/44565968535) verde. Conferir o CI do último SHA na aba Actions da branch.
+- **Verificação local (Node 22.23, PostgreSQL 16.15, usuário sem superusuário):**
+  - `npm run verify` verde, **169 + 1** só-PostgreSQL (= 69 base + 57 PR #9 + 24 PR #10 + 11 migração + 8 coexistência);
+  - PostgreSQL **146/146** em 6 execuções seguidas, sem órfãos nem erro não tratado;
+  - `db:check` ok; audit de produção 0;
+  - `test:mutations` com PostgreSQL **14/14** (M1–M7 + H1–H7).
+  - Ensaio com o **código original** do PR #9 e do PR #10 (seeds em PostgreSQL): o banco do PR #9 é recusado, reconciliado e passa; o do PR #10 sobe para 0004; os esquemas finais são idênticos.
+- **Achados para a fundação (PR #7), não corrigidos nela:**
+  1. corrida no `drop()` do banco de teste, que dava falha intermitente de CI (~1/6) e bancos órfãos; corrigida aqui em `a525baf`;
+  2. **pool do PostgreSQL sem ouvinte de `error`: a API termina quando o servidor encerra uma conexão ociosa** (verificado com `pg_terminate_backend`). Correção mínima descrita no relatório, seção 9.
+- **Não verificado:** Windows, E2E de navegador da UI integrada (só build), revisão humana.
+- **Próxima ação exata:**
+  1. Revisão independente desta branch (relatório + ADR-009 + `docs/MIGRACOES.md`; CI do último SHA).
+  2. Fiscal decide D1–D4 (ADR-008) e a decisão nº 2 do catálogo.
+  3. Merge humano do PR #10 na fundação; depois, PR na fundação com o `drop()` dos testes, o ouvinte de `error` do pool e o guarda.
+  4. Rebase do PR #9 regerando 0003/0004 como em `29fc526`.
+  5. `db:reconcile` em todo banco de dev que rodou o PR #9.
+
+  Sequência detalhada: relatório, seção 10. Nada disso foi executado.
+
 ## Atualização 19/11/2026 (tarde) — CF-FOUND-08-R2: achados P1 e P2 da auditoria do PR #10
 
 - **Branch:** `feat/cf-found-08-temporal` (a mesma do PR #10; base `feat/sprint1-fundacao-segura`). Auditoria em [comentário do PR #10](https://github.com/Inovacao-Contar-Brasil/Calculadora_Fiscal/pull/10#issuecomment-7010097493) sobre `d22f3b2`. Sem merge, sem force push; `main`, PR #7, PR #9 e Premium não foram tocados.
@@ -183,6 +223,7 @@ Passos do CI: `npm ci` → `npm audit --omit=dev --audit-level=high` → `npm ru
 | Importação de NF-e / XML íntegro | `apps/api/src/modules/documents.ts` |
 | Harness e banco exclusivo de teste | `apps/api/src/test/harness.ts`, `pg-test-database.ts` |
 | PGlite em disco | `apps/api/src/db/client.ts` (`ensurePgliteDataDir`) |
+| Histórico de migrações (guarda, reconciliação, sequência canônica) | `apps/api/src/db/migration-history.ts`, `reconcile.ts`, `docs/MIGRACOES.md`, ADR-009 |
 | Contratos do motor (só interfaces) | `packages/domain/src/tributario/index.ts` |
 | Plano da Sprint 2A | `docs/SPRINT2A_ESPECIFICACAO.md`, `docs/adr/ADR-007-*` |
 | Ameaças, audit de dependências | `docs/SEGURANCA.md` |

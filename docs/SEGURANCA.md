@@ -53,6 +53,7 @@ Documento de trabalho da Sprint 1. Complementa as ADRs 002, 003 e 005.
 | Uso de conteúdo licenciado sem autorização | `license_status`; licença não verificada bloqueia conteúdo, importação assistida, aprovação e ativação; mudança de licença só por admin, auditada | `catalog-flow.test.ts` |
 | Fórmula tributária introduzida antes da 2B | guardas de esquema/código/interfaces | `guards.test.ts` |
 | Dependência vulnerável em produção | CI: `npm audit --omit=dev --audit-level=high` bloqueia | CI |
+| Migração pulada em silêncio ou reaplicada sobre histórico divergente (branches paralelas, renumeração) | `assertMigrationHistory` antes do Drizzle: journal estritamente crescente e histórico gravado como prefixo exato (hash + `created_at`); recusa sem escrever nada. Legado do PR #9 só por `db:reconcile`, transacional, auditado e com conferência física (CF-INTEG-01, `docs/MIGRACOES.md`) | `migration-history.test.ts`; mutações H1–H7 |
 
 ## Riscos residuais e pendências
 
@@ -68,6 +69,9 @@ Documento de trabalho da Sprint 1. Complementa as ADRs 002, 003 e 005.
 - Segredos: `SEED_ADMIN_PASSWORD` só em ambiente; trocar após o primeiro login.
 - Catálogo legal: quem pode aprovar e ativar regras ainda não foi decidido (decisão nº 2); a restrição a `admin` é provisória e a ativação técnica não equivale a homologação de negócio. Triggers de imutabilidade não protegem contra quem tem DDL no banco (pode desativá-los) — exige usuário de aplicação sem DDL em produção.
 - Busca textual do catálogo usa `ILIKE` com escape de curingas; sem índice de texto (volume pequeno nesta fase).
+- **Pool do PostgreSQL sem ouvinte de `error`** (`apps/api/src/db/client.ts`, desde o PR #7). Se uma conexão ociosa for encerrada pelo servidor (reinício, failover, `idle_session_timeout`, `pg_terminate_backend`), o pool emite `error` sem ouvinte e o **processo da API termina**. Verificado em 19/11/2026: um `pg_terminate_backend` na conexão ociosa derrubou a API com `Unhandled 'error' event … on BoundPool`. O mesmo mecanismo derrubava workers do Vitest na suíte integrada (CF-INTEG-01, corrigido só no harness). Correção mínima proposta para o PR #7: `pool.on("error", …)` registrando o código do erro sem dados sensíveis, mais um teste com `pg_terminate_backend`.
+- Migrações rodam no boot de cada processo, sem lock entre réplicas: o migrator do Drizzle não usa advisory lock. Com mais de uma réplica, migre num passo único de deploy. A reconciliação (`db:reconcile`) usa `pg_advisory_xact_lock`.
+- Bancos de desenvolvimento que rodaram a branch do PR #9 não podem ser inventariados daqui; o guarda os recusa até a reconciliação (`docs/MIGRACOES.md`).
 
 ## Checklist antes de qualquer ambiente externo
 

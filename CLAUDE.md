@@ -19,6 +19,7 @@ Plataforma SaaS da Contar Brasil para consulta tributária por produto a partir 
 9. **Classificação de item vem só de `classificationFor` e o vínculo item → decisão só de `selectReviewFor`** (`apps/api/src/modules/classification.ts`), na importação, na propagação, na reabertura e na resolução de pendência temporal. Decisão final (homologação **ou rejeição**) vale só dentro da vigência; vigências de decisões finais do mesmo produto são disjuntas e toda escrita na linha do tempo passa pelo lock do item aberto (`lockOpenReview`/UPSERT) — ADR-008. Nota fora da vigência não é homologada nem rejeitada: vira pendência temporal, resolvida por decisão do período, nunca editando a decisão existente. Mudou algo nessas regras? Rode `npm run test:mutations` (com `TEST_DATABASE_URL` para incluir a concorrência). Classificação homologada **não** autoriza cálculo (ADR-007).
 10. **Catálogo legal é append-only e staff-only.** Conteúdo de versão nunca é editado (nova versão); status só muda com linha em `tax_rule_approvals` na mesma transação (trigger); autor não aprova/devolve/ativa. Nenhuma coluna ou código de alíquota/MVA/base no catálogo (`guards.test.ts`). Ver `docs/CATALOGO_LEGAL.md`.
 11. **Testes nunca apagam nada em banco compartilhado.** Os arquivos de teste rodam em paralelo; com `TEST_DATABASE_URL` cada harness cria e remove o próprio banco `cf_test_*` (`apps/api/src/test/pg-test-database.ts`).
+12. **Migração nunca é copiada, renomeada ou reordenada à mão.** O Drizzle aplica só entradas com `when` maior que o último registro aplicado e não compara hash: journal fora de ordem pula migração em silêncio. Branch que integra depois **regera** as próprias migrações (`npm run db:generate`) sobre o histórico de destino. `migrate()` recusa histórico não canônico (`apps/api/src/db/migration-history.ts`); banco com o histórico antigo do PR #9 só passa por `npm run db:reconcile`, com backup. Ver `docs/MIGRACOES.md` e ADR-009.
 
 ## Estrutura
 
@@ -36,11 +37,14 @@ apps/api/             Fastify 5 + Zod 4 + Drizzle ORM (PostgreSQL / PGlite)
   src/modules/catalog/  catálogo legal 2A.1: fontes, snapshots, dispositivos, regras, versões, workflow (staff-only)
   src/modules/classification.ts  regra única de status e de vínculo do item (vigência, lacunas)
   src/db/schema.ts    esquema; drizzle/ migrações SQL geradas
+  src/db/migration-history.ts  guarda do histórico de migrações + reconciliação do legado do PR #9 (CLI reconcile.ts)
   src/test/           harness (PGlite em memória ou banco exclusivo via TEST_DATABASE_URL) e fixtures
 apps/web/             React 19 + Vite; SPA autenticada; roteador próprio (src/router.tsx)
-docs/adr/             decisões arquiteturais (ADR-001…008; 007 = catálogo legal e triagem, proposta; 008 = pendência temporal, proposta)
+docs/adr/             decisões arquiteturais (ADR-001…009; 007 = catálogo legal e triagem, proposta; 008 = pendência temporal, proposta; 009 = histórico de migrações, proposta)
 docs/SPRINT2A_ESPECIFICACAO.md  plano técnico da Sprint 2A (catálogo + triagem, sem cálculo)
 docs/CATALOGO_LEGAL.md          módulo implementado da 2A.1: modelo, workflow, permissões, endpoints
+docs/MIGRACOES.md               histórico canônico de migrações, guarda e reconciliação (CF-INTEG-01)
+docs/INTEGRACAO_CF-INTEG-01.md  relatório da pré-integração fundação + temporal + catálogo
 docs/HANDOFF.md       estado atual e próxima ação — leia primeiro
 docs/SEGURANCA.md     modelo de ameaças e checklist pré-produção
 ```
@@ -55,7 +59,8 @@ npm run verify                   # typecheck + testes + build — obrigatório a
 npm test                         # vitest (projetos "domain" e "api"); API usa PGlite em memória
 TEST_DATABASE_URL=postgres://... npm test -- --project api   # contra PostgreSQL real (URL = conexão admin; requer CREATEDB)
 npm run db:check                 # drizzle-kit check: migrações coerentes (também no CI)
-npm run test:mutations           # mutações das garantias temporais (ADR-008); falha se alguma sobreviver
+npm run test:mutations           # mutações das garantias temporais (M1–M7, ADR-008) e do histórico de migrações (H1–H7); falha se alguma sobreviver
+npm run db:reconcile             # diagnóstico do histórico de migrações; `-- --apply --confirm-database=<nome>` reconcilia o legado do PR #9 (docs/MIGRACOES.md)
 npm run dev                      # API (3333) + web (5173, proxy /api) — PGlite em apps/api/.data
 npm run db:generate              # após alterar src/db/schema.ts: gera migração em apps/api/drizzle
 npm run db:seed                  # cria organização e admin a partir de SEED_* (apps/api/.env)
