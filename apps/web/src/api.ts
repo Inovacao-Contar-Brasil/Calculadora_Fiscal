@@ -162,6 +162,28 @@ export interface ReviewItem {
   updatedAt: string;
 }
 
+/** Pendência temporal: notas fora da vigência da homologação (somente staff). */
+export interface TemporalPendency {
+  id: string;
+  kind: "FORA_DA_VIGENCIA";
+  reasonCode: "EMISSAO_ANTERIOR_A_VIGENCIA" | "EMISSAO_POSTERIOR_A_VIGENCIA" | "EMISSAO_FORA_DA_VIGENCIA";
+  reason: string;
+  organizationId: string;
+  companyId: string;
+  companyName: string;
+  product: { fingerprint: string; ncm: string; cest: string; description: string };
+  decision: { id: string; status: ClassificationStatus; validFrom: string | null; validTo: string | null };
+  origin: { items: number; documents: number; firstIssueDate: string; lastIssueDate: string };
+  action: "REGISTRAR_DECISAO_DO_PERIODO";
+}
+
+export interface TemporalPendencyDetail {
+  pendency: TemporalPendency;
+  occurrences: { nfeItemId: string; documentId: string; number: string; issuedAt: string; issuerName: string; line: number; productCents: number }[];
+  uncoveredPeriods: { from: string | null; to: string | null; items: number }[];
+  decisions: { id: string; status: ClassificationStatus; validFrom: string | null; validTo: string | null }[];
+}
+
 export interface OrgUser {
   id: string;
   email: string;

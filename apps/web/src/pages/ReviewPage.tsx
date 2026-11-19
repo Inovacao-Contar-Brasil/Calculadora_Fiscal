@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { api, formatDate, formatDateTime, money, type ClassificationStatus, type Company, type ReviewItem } from "../api";
+import { api, formatDate, formatDateTime, money, type ClassificationStatus, type Company, type ReviewItem, type TemporalPendency, type TemporalPendencyDetail } from "../api";
 import { ClassificationBadge, Empty, ErrorBox, Loading, Notice, useLoad } from "../components";
 import { Link, navigate } from "../router";
 
@@ -14,6 +14,7 @@ export function ReviewQueuePage() {
   if (companyId) query.set("companyId", companyId);
   if (status) query.set("status", status);
   const list = useLoad(() => api<{ items: ReviewItem[] }>("/api/review-items?" + query.toString()), [companyId, status]);
+  const temporal = useLoad(() => api<{ items: TemporalPendency[] }>("/api/temporal-pendencies" + (companyId ? "?companyId=" + companyId : "")), [companyId]);
 
   return (
     <>
@@ -38,6 +39,31 @@ export function ReviewQueuePage() {
           </select>
         </label>
       </div>
+      <ErrorBox error={temporal.error} />
+      {temporal.data && temporal.data.items.length > 0 && (
+        <section className="tablecard">
+          <div className="tablehead">
+            <h3>Notas fora da vigência da homologação</h3>
+            <p>A classificação homologada é válida, mas não cobre a data de emissão destas notas. Elas seguem pendentes até uma decisão para o período; a homologação existente não é alterada.</p>
+          </div>
+          <div className="tablewrap">
+            <table className="compact">
+              <thead><tr><th>Produto</th><th>Empresa</th><th>Homologação vigente</th><th>Notas pendentes</th><th>Emissões</th></tr></thead>
+              <tbody>
+                {temporal.data.items.map((p) => (
+                  <tr key={p.id} className="clickable" onClick={() => navigate("/revisao/" + p.id)}>
+                    <td><strong>{p.product.description}</strong><small>{p.reason}</small></td>
+                    <td>{p.companyName}</td>
+                    <td>{formatDate(p.decision.validFrom)} → {p.decision.validTo ? formatDate(p.decision.validTo) : "em aberto"}</td>
+                    <td>{p.origin.items} item(ns) em {p.origin.documents} NF-e</td>
+                    <td>{formatDate(p.origin.firstIssueDate)} a {formatDate(p.origin.lastIssueDate)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
       <ErrorBox error={list.error} />
       {list.loading && <Loading />}
       {list.data && list.data.items.length === 0 && <Empty title="Nenhum produto nesta situação." />}
@@ -71,6 +97,92 @@ interface ReviewDetail {
   company: { id: string; legalName: string };
   occurrences: { documentId: string; number: string; issuedAt: string; issuerName: string; line: number; productCents: number; classificationStatus: ClassificationStatus }[];
   history: ReviewItem[];
+  outOfValidityItems: number;
+}
+
+/**
+ * Pendência temporal da decisão: notas emitidas fora da vigência. O Fiscal
+ * registra uma decisão para um período sem decisão; a homologação exibida
+ * acima não é alterada.
+ */
+function TemporalPendencyCard({ id, onResolved }: { id: string; onResolved: () => void }) {
+  const { data, error, loading, reload } = useLoad(() => api<TemporalPendencyDetail>("/api/temporal-pendencies/" + id), [id]);
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [actionError, setActionError] = useState<unknown>(null);
+  const [form, setForm] = useState({ status: "HOMOLOGADO" as "HOMOLOGADO" | "REJEITADO", validFrom: "", validTo: "", enquadramento: "", fundamentoLegal: "", observacoes: "", justification: "" });
+  if (loading) return <Loading />;
+  if (error || !data) return <ErrorBox error={error} />;
+  const { pendency, occurrences, uncoveredPeriods } = data;
+
+  function choose(period: { from: string | null; to: string | null }) {
+    const first = occurrences.map((o) => o.issuedAt.slice(0, 10)).filter((d) => (!period.from || d >= period.from) && (!period.to || d <= period.to)).sort()[0] ?? "";
+    // Lacuna sem início definido: sugere o primeiro dia do mês da nota mais antiga (editável).
+    setForm({ ...form, validFrom: period.from ?? (first ? first.slice(0, 8) + "01" : ""), validTo: period.to ?? "" });
+    setOpen(true);
+  }
+  async function onSubmit(event: FormEvent) {
+    event.preventDefault();
+    setBusy(true);
+    setActionError(null);
+    try {
+      await api("/api/temporal-pendencies/" + id + "/resolve", {
+        method: "POST",
+        body: {
+          status: form.status,
+          validFrom: form.validFrom,
+          validTo: form.validTo || undefined,
+          justification: form.justification,
+          decision: form.status === "HOMOLOGADO" || form.enquadramento ? { enquadramento: form.enquadramento, fundamentoLegal: form.fundamentoLegal, observacoes: form.observacoes || undefined } : undefined,
+        },
+      });
+      setOpen(false);
+      reload();
+      onResolved();
+    } catch (failure) {
+      setActionError(failure);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="card form">
+      <div className="section-label">Pendência temporal</div>
+      <Notice tone="warning">{pendency.reason}</Notice>
+      <p className="muted">Períodos sem decisão com notas pendentes: {uncoveredPeriods.map((p) => (p.from ? formatDate(p.from) : "antes") + " → " + (p.to ? formatDate(p.to) : "em aberto") + " (" + p.items + ")").join(" · ")}</p>
+      {!open && (
+        <div className="actions">
+          {uncoveredPeriods.map((p) => (
+            <button key={(p.from ?? "") + (p.to ?? "")} type="button" className="button" onClick={() => choose(p)}>
+              Registrar decisão para {p.from ? formatDate(p.from) : "o período"} → {p.to ? formatDate(p.to) : "em aberto"}
+            </button>
+          ))}
+        </div>
+      )}
+      {open && (
+        <form className="form" onSubmit={onSubmit}>
+          <p className="muted">Registra uma nova decisão, apenas para o período informado. Classificação homologada não autoriza cálculo.</p>
+          <div className="formgrid">
+            <label>Decisão
+              <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as "HOMOLOGADO" | "REJEITADO" })}>
+                <option value="HOMOLOGADO">Homologar o período</option>
+                <option value="REJEITADO">Rejeitar o período</option>
+              </select>
+            </label>
+            <span />
+            <label>Início do período<input type="date" value={form.validFrom} onChange={(e) => setForm({ ...form, validFrom: e.target.value })} required /></label>
+            <label>Fim do período<input type="date" value={form.validTo} onChange={(e) => setForm({ ...form, validTo: e.target.value })} required /></label>
+            {form.status === "HOMOLOGADO" && <label className="span2">Enquadramento<input value={form.enquadramento} onChange={(e) => setForm({ ...form, enquadramento: e.target.value })} required /></label>}
+            {form.status === "HOMOLOGADO" && <label className="span2">Fundamento legal do período<textarea rows={2} value={form.fundamentoLegal} onChange={(e) => setForm({ ...form, fundamentoLegal: e.target.value })} required placeholder="Norma vigente no período, artigo/anexo e link oficial" /></label>}
+            <label className="span2">Justificativa<textarea rows={2} value={form.justification} onChange={(e) => setForm({ ...form, justification: e.target.value })} required /></label>
+          </div>
+          <ErrorBox error={actionError} />
+          <div className="actions"><button type="submit" className="button" disabled={busy}>Confirmar decisão do período</button><button type="button" className="button secondary" onClick={() => setOpen(false)}>Cancelar</button></div>
+        </form>
+      )}
+    </div>
+  );
 }
 
 export function ReviewDetailPage({ id }: { id: string }) {
@@ -82,7 +194,7 @@ export function ReviewDetailPage({ id }: { id: string }) {
 
   if (loading) return <Loading />;
   if (error || !data) return <ErrorBox error={error ?? new Error("Item não encontrado.")} />;
-  const { item, company, occurrences, history } = data;
+  const { item, company, occurrences, history, outOfValidityItems } = data;
   const open = item.validTo === null;
   const final = item.status === "HOMOLOGADO" || item.status === "REJEITADO";
 
@@ -141,6 +253,7 @@ export function ReviewDetailPage({ id }: { id: string }) {
         </div>
       )}
       {item.justification && <Notice><strong>Justificativa:</strong> {item.justification}</Notice>}
+      {outOfValidityItems > 0 && <TemporalPendencyCard id={item.id} onResolved={reload} />}
 
       {open && (
         <div className="actions">
