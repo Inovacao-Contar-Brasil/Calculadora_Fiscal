@@ -16,7 +16,7 @@ Plataforma SaaS da Contar Brasil para consulta tributária por produto a partir 
 6. **Não modifique o Hub Contar Brasil.**
 7. **Não anuncie como pronto o que não foi testado.** Rode `npm run verify` antes de cada commit.
 8. **Atualize `docs/HANDOFF.md`** após cada marco e antes de encerrar a sessão.
-9. **Classificação de item vem só de `classificationFor`** (`apps/api/src/modules/classification.ts`), na importação e na propagação. Homologação vale só dentro da vigência. Classificação homologada **não** autoriza cálculo (ADR-007).
+9. **Classificação de item vem só de `classificationFor` e o vínculo item → decisão só de `selectReviewFor`** (`apps/api/src/modules/classification.ts`), na importação, na propagação, na reabertura e na resolução de pendência temporal. Homologação vale só dentro da vigência; vigências de decisões finais do mesmo produto são disjuntas e toda escrita na linha do tempo passa pelo lock do item aberto (`lockOpenReview`/UPSERT) — ADR-008. Nota fora da vigência não é homologada: vira pendência temporal, resolvida por decisão do período, nunca editando a homologação. Classificação homologada **não** autoriza cálculo (ADR-007).
 10. **Testes nunca apagam nada em banco compartilhado.** Os arquivos de teste rodam em paralelo; com `TEST_DATABASE_URL` cada harness cria e remove o próprio banco `cf_test_*` (`apps/api/src/test/pg-test-database.ts`).
 
 ## Estrutura
@@ -30,12 +30,12 @@ packages/domain/      domínio puro (sem framework/banco/UI)
 apps/api/             Fastify 5 + Zod 4 + Drizzle ORM (PostgreSQL / PGlite)
   src/app.ts          montagem do servidor (helmet, cookie, rate limit, CSRF, erros)
   src/auth/           senha (scrypt), sessão (token opaco + SHA-256), autorização
-  src/modules/        auth, companies, fiscal-profiles, documents, review (rotas + regras)
-  src/modules/classification.ts  regra única de status do item a partir da decisão
+  src/modules/        auth, companies, fiscal-profiles, documents, review, temporal-pendencies (rotas + regras)
+  src/modules/classification.ts  regra única de status e de vínculo do item (vigência, lacunas)
   src/db/schema.ts    esquema; drizzle/ migrações SQL geradas
   src/test/           harness (PGlite em memória ou banco exclusivo via TEST_DATABASE_URL) e fixtures
 apps/web/             React 19 + Vite; SPA autenticada; roteador próprio (src/router.tsx)
-docs/adr/             decisões arquiteturais (ADR-001…007; 007 = catálogo legal e triagem, proposta)
+docs/adr/             decisões arquiteturais (ADR-001…008; 007 = catálogo legal e triagem, proposta; 008 = pendência temporal, proposta)
 docs/SPRINT2A_ESPECIFICACAO.md  plano técnico da Sprint 2A (catálogo + triagem, sem cálculo)
 docs/HANDOFF.md       estado atual e próxima ação — leia primeiro
 docs/SEGURANCA.md     modelo de ameaças e checklist pré-produção

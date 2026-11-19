@@ -2,6 +2,29 @@
 
 > Leia junto com `CLAUDE.md`. Atualize este arquivo após cada marco e antes de encerrar a sessão. Não dependa do histórico de nenhuma conversa: tudo o que importa está aqui, nos commits e nas Issues.
 
+## Atualização 19/11/2026 — CF-FOUND-08-TEMPORAL (Issue #8, achado 2)
+
+- **Branch:** `feat/cf-found-08-temporal`, criada de `70c5c17` (HEAD da fundação). **PR:** [Inovacao-Contar-Brasil/Calculadora_Fiscal#10](https://github.com/Inovacao-Contar-Brasil/Calculadora_Fiscal/pull/10), **draft**, base `feat/sprint1-fundacao-segura` (depende do PR #7). Sem merge; entra na fundação só após revisão independente.
+- **Commits:**
+
+| Commit | O quê | CI (push) |
+|---|---|---|
+| `48f211a` | test: reprodução — 9 casos falham contra `70c5c17` (intencional) | [44522068608](https://github.com/Inovacao-Contar-Brasil/Calculadora_Fiscal/actions/runs/44522068608) **vermelho no passo de testes PGlite** (esperado) |
+| `cdb051e` | fix(review): vínculo pela vigência, vigências disjuntas sob lock, reabertura sem órfãs, projeção e resolução de pendência temporal, migração `0001` | [44524034994](https://github.com/Inovacao-Contar-Brasil/Calculadora_Fiscal/actions/runs/44524034994) verde |
+| `163eafb` | feat(web): seção de pendências na fila e cartão de resolução no detalhe | ver Actions |
+| `a0e0c9c` | fix(review): 409 explícito se a resolução não obtiver o lock (reabertura concorrente) | ver Actions |
+| (este) | docs: ADR-008, HANDOFF, CLAUDE.md, ARQUITETURA, SEGURANCA, ADR-004 | ver Actions / PR #10 |
+
+- **Causa raiz:** a importação vinculava a nota ao item de revisão **aberto**, não à decisão que cobre a emissão; nada representava nota pendente presa a homologação que não a cobre; reabertura deixava órfãs as notas anteriores ao início; vigências sobrepostas eram aceitas. Detalhe e alternativas em `docs/adr/ADR-008-pendencia-temporal-e-linha-do-tempo.md`.
+- **Solução (sem tabela nova):** `selectReviewFor` (vínculo único) + vigências disjuntas (422/409) + `lockOpenReview` em toda escrita da linha do tempo + pendência temporal como projeção (`GET /api/temporal-pendencies`, `GET /api/temporal-pendencies/:id`, `POST /api/temporal-pendencies/:id/resolve`, staff-only). Resolver = nova decisão final para um período sem decisão; a homologação original não muda.
+- **Mudanças de comportamento em rotas existentes:** reabrir exige decisão final (422) e move à nova análise toda nota não coberta pela decisão encerrada (inclusive anteriores ao início; vale também para rejeição); `PATCH` final recusa vigência que comece antes do fim da decisão encerrada (422) e, sem data, começa no dia seguinte a ela; `GET /api/review-items/:id` ganhou `outOfValidityItems`.
+- **Migração `0001_temporal_pendencias` (aditiva):** índice `nfe_items_review_item_idx` e `CHECK review_items_vigencia_ordenada_chk`. Upgrade conferido em PostgreSQL 16 com dados (0000 → dados → 0001).
+- **Verificação local (Linux, Node 22.23, PostgreSQL 16.15):** `npm run verify` verde (PGlite: 86 + 1 só-PostgreSQL); `TEST_DATABASE_URL=… npm test -- --project api` 74/74 em 3 execuções seguidas, sem `cf_test_*` remanescente; `npm run db:check` ok; `npm audit --omit=dev --audit-level=high` 0 vulnerabilidades.
+- **Prova de que os testes pegam o problema:** mutações detectadas — sem `lockOpenReview` na resolução (PostgreSQL: várias 201 e decisões sobrepostas), importação vinculando sempre ao item aberto (4 testes falham), reabertura antiga (2 testes falham). O teste de resoluções simultâneas aquece o pool do `pg` antes; sem isso a corrida não era exercitada (verificado).
+- **Navegador:** teste de fumaça Playwright/Chromium com PGlite isolado e dados sintéticos — pendência listada, resolvida pela UI, some da fila, homologação intacta. Não é teste automatizado do repositório.
+- **Não verificado:** Windows (`npm.cmd`), revisão humana, E2E completo de todos os perfis, carga/volume da projeção.
+- **Próxima ação exata:** (1) revisão independente do PR #10 (ler ADR-008 primeiro; conferir CI do último SHA); (2) aprovado, o revisor humano incorpora em `feat/sprint1-fundacao-segura` (merge do PR #10 na base da fundação — nunca na `main`); (3) seguir os gates do PR #7 (Windows, E2E, revisão final). Não iniciar cálculo; não retargetar/mergear PR #9 antes disso.
+
 ## Atualização 17/11/2026 — revisão independente, sem Fable
 
 - **Issue #8 parcialmente corrigida diretamente pelo GitHub**, no PR #7 ainda em draft e sem merge:
@@ -77,7 +100,7 @@ Passos do CI: `npm ci` → `npm audit --omit=dev --audit-level=high` → `npm ru
 3. **E2E em navegador** do fluxo completo (recomendado pela Issue #5; não feito). Frontend continua sem testes automatizados.
 4. **Decisões de negócio:** retenção LGPD do XML (ADR-005), hospedagem/PostgreSQL gerenciado, e-mail para recuperação de senha, licença Econet, e as 9 decisões listadas na seção 11 da especificação 2A.
 5. Rate limit em memória (uma réplica); sem MFA; sem expiração por inatividade; sem RLS; sem Dependabot.
-6. Homologação com `validFrom` posterior a notas já importadas deixa essas notas `PENDENTE_REVISAO` sem item de revisão aberto que as cubra (lado seguro; a Sprint 2A trata com reprocessamento).
+6. ~~Homologação com `validFrom` posterior a notas já importadas deixa essas notas sem fluxo~~ — tratado no PR #10 (pendência temporal, ADR-008), aguardando revisão. Risco residual: vigências disjuntas garantidas pela aplicação (lock), não por constraint de exclusão; bancos de desenvolvimento antigos podem ter notas órfãs (recriar `apps/api/.data`).
 7. Se um processo de teste for morto, pode sobrar banco `cf_test_*` no PostgreSQL local; remover manualmente.
 
 ## Arquivos e módulos relevantes
@@ -86,7 +109,8 @@ Passos do CI: `npm ci` → `npm audit --omit=dev --audit-level=high` → `npm ru
 |---|---|
 | Servidor, sessão/CSRF, erros | `apps/api/src/app.ts`, `apps/api/src/errors.ts` (`asNotFound`) |
 | Autorização por empresa/papel | `apps/api/src/auth/authorize.ts`, `loadReviewForStaff` em `modules/review.ts` |
-| Regra de classificação do item | `apps/api/src/modules/classification.ts` |
+| Regra de classificação e de vínculo do item | `apps/api/src/modules/classification.ts` (`classificationFor`, `selectReviewFor`, lacunas) |
+| Pendência temporal (projeção e resolução) | `apps/api/src/modules/temporal-pendencies.ts`, ADR-008 |
 | Importação de NF-e / XML íntegro | `apps/api/src/modules/documents.ts` |
 | Harness e banco exclusivo de teste | `apps/api/src/test/harness.ts`, `pg-test-database.ts` |
 | PGlite em disco | `apps/api/src/db/client.ts` (`ensurePgliteDataDir`) |

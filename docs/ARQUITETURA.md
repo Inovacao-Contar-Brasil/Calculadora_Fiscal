@@ -30,14 +30,15 @@ Visão da arquitetura após a Sprint 1. Decisões detalhadas em `docs/adr/`.
 | `fiscal-profiles` | cadastro fiscal versionado com vigência | `GET|POST /api/companies/:id/fiscal-profiles`, `/current?date=`, `/audit` |
 | `documents` | importação de NF-e, histórico, detalhe, XML original | `POST|GET /api/companies/:id/documents`, `GET /api/documents/:id`, `/xml` |
 | `review` | fila de classificação, decisões, memória, reabertura | `GET /api/review-items`, `GET|PATCH /api/review-items/:id`, `POST /api/review-items/:id/reopen` |
+| `temporal-pendencies` | notas fora da vigência da homologação (projeção, staff-only) e decisão do período (ADR-008) | `GET /api/temporal-pendencies`, `GET /api/temporal-pendencies/:id`, `POST /api/temporal-pendencies/:id/resolve` |
 
 ## Modelo de dados (resumo)
 
-`organizations` → `memberships` (papel) → `users`; `organizations` → `companies` → `company_access`; `companies` → `company_fiscal_profiles` (versões com `valid_from/valid_to`), `nfe_documents` (XML íntegro + SHA-256, único por chave na empresa) → `nfe_items` (status de classificação, `fingerprint`); `review_items` (um por produto/empresa vigente; decisão com vigência); `sessions`; `audit_events`.
+`organizations` → `memberships` (papel) → `users`; `organizations` → `companies` → `company_access`; `companies` → `company_fiscal_profiles` (versões com `valid_from/valid_to`), `nfe_documents` (XML íntegro + SHA-256, único por chave na empresa) → `nfe_items` (status de classificação, `fingerprint`); `review_items` (um aberto por produto/empresa; as decisões finais do produto formam uma linha do tempo de vigências disjuntas, inclusive decisões de período — ADR-008; `nfe_items.review_item_id` aponta para a decisão que cobre a emissão); `sessions`; `audit_events`.
 
 ## Fluxo de importação
 
-autenticação → empresa acessível → corpo XML (≤ 5 MB) → `parseNfe` (DTD proibido, modelo 55, centavos) → chave 44 dígitos → CNPJ destinatário = empresa → já existe? devolve duplicado → transação: documento + itens + fila de revisão (herda decisão vigente na emissão) + auditoria → status `COM_PENDENCIAS` ou `REVISADA`.
+autenticação → empresa acessível → corpo XML (≤ 5 MB) → `parseNfe` (DTD proibido, modelo 55, centavos) → chave 44 dígitos → CNPJ destinatário = empresa → já existe? devolve duplicado → transação: documento + UPSERT do item aberto de cada produto (ordem fixa; trava a linha) + itens vinculados por `selectReviewFor` à decisão que cobre a emissão, com status de `classificationFor` + auditoria → status `COM_PENDENCIAS` ou `REVISADA`.
 
 ## Preparação para o motor tributário
 

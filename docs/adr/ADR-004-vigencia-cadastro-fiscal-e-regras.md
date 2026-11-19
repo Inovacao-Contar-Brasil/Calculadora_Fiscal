@@ -37,6 +37,10 @@ Regime tributário, CNAEs e parâmetros de uma empresa mudam ao longo do tempo, 
 | Tabelas temporais (`tstzrange` + constraint de exclusão) | Mais rigoroso, mas PGlite/Drizzle têm suporte limitado; o modelo atual já impede sobreposição pela regra "valid_from estritamente posterior". Reavaliar quando houver correção retroativa. |
 | Classificação por organização em vez de por empresa | Produtos iguais podem ter tratamentos distintos por regime/UF da empresa; decisões por empresa são mais seguras. Reaproveitamento entre empresas pode vir depois como sugestão, nunca automático. |
 
+## Atualização 2026-11-19 (ADR-008, proposta)
+
+Notas emitidas fora da vigência de uma homologação passam a ter fluxo próprio (pendência temporal) e as decisões finais de um produto formam uma linha do tempo de vigências disjuntas: cada item de NF-e se vincula à decisão que cobre a sua emissão (`selectReviewFor`), a reabertura leva à nova análise toda nota que a decisão encerrada não cobre, e o Fiscal pode registrar uma decisão para um período anterior sem alterar a homologação existente. Ver `ADR-008-pendencia-temporal-e-linha-do-tempo.md`.
+
 ## Consequências
 
 - Reprocessar uma NF-e antiga é determinístico: basta consultar perfil e decisões vigentes na emissão.
